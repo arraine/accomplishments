@@ -325,6 +325,13 @@ button {
   color: var(--text);
 }
 
+.primary-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .account-error {
   display: flex;
   justify-content: space-between;
@@ -449,6 +456,12 @@ button {
   border-radius: 28px;
   padding: 18px 22px;
   margin-bottom: 20px;
+}
+
+.assistant-meta {
+  display: grid;
+  gap: 4px;
+  text-align: right;
 }
 
 .assistant-message,

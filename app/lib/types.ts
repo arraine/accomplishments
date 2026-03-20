@@ -36,3 +36,9 @@ export type StoredState = {
   draftGoals: string;
   draftCompetencies: string;
 };
+
+export type LlmCategorizationResult = {
+  assistantNote: string;
+  suggestedGoalIds: string[];
+  suggestedCompetencyIds: string[];
+};

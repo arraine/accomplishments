@@ -6,7 +6,7 @@ A local-first Next.js app for tracking daily accomplishments against company com
 
 - stores goals and competencies for categorization
 - records daily accomplishments with assistant-style acknowledgment
-- suggests categorization when the user does not manually assign links
+- suggests categorization with OpenAI when the user does not manually assign links
 - aggregates similar recent accomplishments into a stronger combined entry
 - shows current-year summaries grouped by goal or competency
 - supports Supabase email/password sign-in with per-user cloud save
@@ -26,6 +26,13 @@ npm run dev
 ```
 
 3. Open [http://localhost:3000](http://localhost:3000).
+
+## OpenAI setup
+
+1. Add `OPENAI_API_KEY` to `.env.local`.
+2. Optionally set `OPENAI_MODEL` if you do not want the default `gpt-5-mini`.
+
+The app uses the OpenAI Responses API on the server to classify accomplishments against goals and competencies. If the key is missing or the API request fails, the app falls back to the local rules-based categorizer.
 
 ## Supabase setup
 

@@ -10,6 +10,7 @@ import {
   normalizeText
 } from "./lib/store";
 import { useAccomplishmentsStore } from "./lib/store-provider";
+import type { LlmCategorizationResult } from "./lib/types";
 
 export default function Home() {
   const {
@@ -26,6 +27,7 @@ export default function Home() {
   const [entryDate, setEntryDate] = useState(today);
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
   const [selectedCompetencies, setSelectedCompetencies] = useState<string[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [message, setMessage] = useState(
     "Acting as your accomplishments assistant. Record what you did, and I’ll keep the log organized against your goals and competencies."
   );
@@ -57,7 +59,28 @@ export default function Home() {
     );
   }
 
-  function handleEntrySubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function fetchLlmCategorization(
+    accomplishment: string
+  ): Promise<LlmCategorizationResult | null> {
+    const response = await fetch("/api/categorize", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        accomplishment,
+        framework
+      })
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return (await response.json()) as LlmCategorizationResult;
+  }
+
+  async function handleEntrySubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const trimmed = entryText.trim();
@@ -66,72 +89,89 @@ export default function Home() {
       return;
     }
 
-    const suggested = framework.length ? classifyAccomplishment(trimmed, framework) : null;
-    const draftLinks = {
-      goals: selectedGoals.length ? selectedGoals : suggested?.goals ?? [],
-      competencies: selectedCompetencies.length
-        ? selectedCompetencies
-        : suggested?.competencies ?? []
-    };
-    const suggestedMatch = findSuggestedMatch(trimmed, accomplishments);
+    setIsAnalyzing(true);
 
-    if (suggestedMatch) {
-      setAccomplishments((current) =>
-        current.map((item) => {
-          if (item.id !== suggestedMatch.accomplishmentId) {
-            return item;
-          }
-
-          const nextCount = item.count + 1;
-          const combinedLinks = Array.from(
-            new Set([...item.links, ...draftLinks.goals, ...draftLinks.competencies])
-          );
-
-          return {
-            ...item,
-            date: entryDate,
-            createdAt: new Date(`${entryDate}T12:00:00`).toISOString(),
-            links: combinedLinks,
-            count: nextCount,
-            history: [...item.history, trimmed],
-            assistantNote: formatAssistantNote(
-              {
-                goals: combinedLinks.filter((id) => goals.some((goal) => goal.id === id)),
-                competencies: combinedLinks.filter((id) =>
-                  competencies.some((competency) => competency.id === id)
-                )
-              },
-              framework,
-              nextCount,
-              true
-            )
-          };
-        })
-      );
-      setMessage(
-        `Logged and aggregated with a recent entry. ${suggestedMatch.reason} Occurrence count increased.`
-      );
-    } else {
-      const links = [...draftLinks.goals, ...draftLinks.competencies];
-      const newEntry = {
-        id: crypto.randomUUID(),
-        createdAt: new Date(`${entryDate}T12:00:00`).toISOString(),
-        date: entryDate,
-        text: trimmed,
-        normalized: normalizeText(trimmed),
-        links,
-        count: 1,
-        history: [trimmed],
-        assistantNote: formatAssistantNote(draftLinks, framework, 1, false)
+    try {
+      const llmSuggested =
+        framework.length && !selectedGoals.length && !selectedCompetencies.length
+          ? await fetchLlmCategorization(trimmed)
+          : null;
+      const suggested = framework.length ? classifyAccomplishment(trimmed, framework) : null;
+      const draftLinks = {
+        goals: selectedGoals.length
+          ? selectedGoals
+          : llmSuggested?.suggestedGoalIds.length
+            ? llmSuggested.suggestedGoalIds
+            : suggested?.goals ?? [],
+        competencies: selectedCompetencies.length
+          ? selectedCompetencies
+          : llmSuggested?.suggestedCompetencyIds.length
+            ? llmSuggested.suggestedCompetencyIds
+            : suggested?.competencies ?? []
       };
+      const suggestedMatch = findSuggestedMatch(trimmed, accomplishments);
 
-      setAccomplishments((current) => [newEntry, ...current]);
-      setMessage(newEntry.assistantNote);
+      if (suggestedMatch) {
+        setAccomplishments((current) =>
+          current.map((item) => {
+            if (item.id !== suggestedMatch.accomplishmentId) {
+              return item;
+            }
+
+            const nextCount = item.count + 1;
+            const combinedLinks = Array.from(
+              new Set([...item.links, ...draftLinks.goals, ...draftLinks.competencies])
+            );
+
+            return {
+              ...item,
+              date: entryDate,
+              createdAt: new Date(`${entryDate}T12:00:00`).toISOString(),
+              links: combinedLinks,
+              count: nextCount,
+              history: [...item.history, trimmed],
+              assistantNote: formatAssistantNote(
+                {
+                  goals: combinedLinks.filter((id) => goals.some((goal) => goal.id === id)),
+                  competencies: combinedLinks.filter((id) =>
+                    competencies.some((competency) => competency.id === id)
+                  )
+                },
+                framework,
+                nextCount,
+                true
+              )
+            };
+          })
+        );
+        setMessage(
+          `Logged and aggregated with a recent entry. ${suggestedMatch.reason} Occurrence count increased.`
+        );
+      } else {
+        const links = [...draftLinks.goals, ...draftLinks.competencies];
+        const newEntry = {
+          id: crypto.randomUUID(),
+          createdAt: new Date(`${entryDate}T12:00:00`).toISOString(),
+          date: entryDate,
+          text: trimmed,
+          normalized: normalizeText(trimmed),
+          links,
+          count: 1,
+          history: [trimmed],
+          assistantNote:
+            llmSuggested?.assistantNote || formatAssistantNote(draftLinks, framework, 1, false)
+        };
+
+        setAccomplishments((current) => [newEntry, ...current]);
+        setMessage(newEntry.assistantNote);
+      }
+
+      setEntryText("");
+      setSelectedGoals([]);
+      setSelectedCompetencies([]);
+    } finally {
+      setIsAnalyzing(false);
     }
-
-    setEntryText("");
-    setSelectedGoals([]);
-    setSelectedCompetencies([]);
   }
 
   if (!loaded) {
@@ -175,7 +215,14 @@ export default function Home() {
           <p className="assistant-label">Assistant status</p>
           <p className="assistant-message">{message}</p>
         </div>
-        <p className="assistant-date">Current log date: {formatFriendlyDate(entryDate)}</p>
+        <div className="assistant-meta">
+          <p className="assistant-date">Current log date: {formatFriendlyDate(entryDate)}</p>
+          <p className="assistant-date">
+            {isAnalyzing
+              ? "Analyzing with OpenAI..."
+              : "Manual links override assistant suggestions."}
+          </p>
+        </div>
       </section>
 
       <section className="app-grid">
@@ -267,8 +314,8 @@ export default function Home() {
                 </div>
               </div>
 
-              <button className="primary-button" type="submit">
-                Log accomplishment
+              <button className="primary-button" type="submit" disabled={isAnalyzing}>
+                {isAnalyzing ? "Analyzing..." : "Log accomplishment"}
               </button>
             </form>
           </article>
