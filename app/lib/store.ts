@@ -6,6 +6,7 @@ import type {
   CompetencyLevel,
   DraftLinks,
   FrameworkItem,
+  GoalObjective,
   ItemKind,
   SuggestedMatch
 } from "./types";
@@ -50,6 +51,45 @@ export function flattenCompetencyCategories(categories: CompetencyCategory[]): F
       categoryName: category.name
     }))
   );
+}
+
+export function flattenGoalObjectives(goals: GoalObjective[]): FrameworkItem[] {
+  return goals.map((goal) => ({
+    id: goal.id,
+    name: goal.objective,
+    description: goal.description || goal.keyResults.map((item) => item.text).join(" | "),
+    kind: "goal" as const
+  }));
+}
+
+export function serializeGoalObjectives(goals: GoalObjective[]) {
+  return goals
+    .map((goal) => {
+      const lines = [
+        goal.description ? `${goal.objective}: ${goal.description}` : goal.objective,
+        ...goal.keyResults.map((keyResult) => `- ${keyResult.text}`)
+      ];
+
+      return lines.join("\n");
+    })
+    .join("\n\n");
+}
+
+export function parseLegacyGoals(raw: string): GoalObjective[] {
+  return raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [objective, ...rest] = line.split(":");
+
+      return {
+        id: crypto.randomUUID(),
+        objective: objective.trim(),
+        description: rest.join(":").trim(),
+        keyResults: []
+      };
+    });
 }
 
 export function serializeCompetencyCategories(categories: CompetencyCategory[]) {

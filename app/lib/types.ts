@@ -14,6 +14,18 @@ export type CompetencyCategory = {
   competencies: CompetencyDefinition[];
 };
 
+export type KeyResult = {
+  id: string;
+  text: string;
+};
+
+export type GoalObjective = {
+  id: string;
+  objective: string;
+  description: string;
+  keyResults: KeyResult[];
+};
+
 export type FrameworkItem = {
   id: string;
   name: string;
@@ -49,6 +61,7 @@ export type StoredState = {
   framework: FrameworkItem[];
   accomplishments: Accomplishment[];
   draftGoals: string;
+  goalObjectives?: GoalObjective[];
   draftCompetencies?: string;
   competencyLevel?: CompetencyLevel;
   competencyCategories?: CompetencyCategory[];

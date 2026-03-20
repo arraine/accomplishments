@@ -15,12 +15,15 @@ import type { Session, User } from "@supabase/supabase-js";
 import {
   classifyAccomplishment,
   flattenCompetencyCategories,
+  flattenGoalObjectives,
   formatAssistantNote,
   getDefaultCompetencyLevel,
   getTodayString,
   normalizeText,
   parseLegacyCompetencies,
+  parseLegacyGoals,
   parseList,
+  serializeGoalObjectives,
   serializeCompetencyCategories
 } from "./store";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "./supabase";
@@ -29,6 +32,7 @@ import type {
   CompetencyCategory,
   CompetencyLevel,
   FrameworkItem,
+  GoalObjective,
   StoredState
 } from "./types";
 
@@ -37,6 +41,10 @@ type AuthMode = "idle" | "signing-in" | "signing-up" | "signed-in";
 type SaveCompetenciesPayload = {
   competencyCategories: CompetencyCategory[];
   competencyLevel: CompetencyLevel;
+};
+
+type SaveGoalsPayload = {
+  goalObjectives: GoalObjective[];
 };
 
 type StoreContextValue = {
@@ -49,11 +57,12 @@ type StoreContextValue = {
   currentYearAccomplishments: Accomplishment[];
   draftGoals: string;
   framework: FrameworkItem[];
+  goalObjectives: GoalObjective[];
   goals: FrameworkItem[];
   isCloudConfigured: boolean;
   loaded: boolean;
   saveCompetencies: (payload: SaveCompetenciesPayload) => void;
-  saveGoals: (raw: string) => void;
+  saveGoals: (payload: SaveGoalsPayload) => void;
   session: Session | null;
   setAccomplishments: Dispatch<SetStateAction<Accomplishment[]>>;
   setAuthError: Dispatch<SetStateAction<string | null>>;
@@ -67,11 +76,33 @@ type StoreContextValue = {
 
 const STORAGE_KEY = "accomplishments-assistant-v1";
 
-const seededGoals = [
-  "Build trust with cross-functional partners",
-  "Drive projects through ambiguity",
-  "Create visible impact for the business"
-].join("\n");
+const seededGoalObjectives: GoalObjective[] = [
+  {
+    id: "seed-goal-trust",
+    objective: "Build trust with cross-functional partners",
+    description: "Create dependable collaboration across teams.",
+    keyResults: [
+      { id: "seed-kr-trust-1", text: "Share timely project updates with partner teams." },
+      { id: "seed-kr-trust-2", text: "Reduce surprises by surfacing risks early." }
+    ]
+  },
+  {
+    id: "seed-goal-ambiguity",
+    objective: "Drive projects through ambiguity",
+    description: "Bring clarity and momentum to complex initiatives.",
+    keyResults: [
+      { id: "seed-kr-ambiguity-1", text: "Define milestones and owners for uncertain work." }
+    ]
+  },
+  {
+    id: "seed-goal-impact",
+    objective: "Create visible impact for the business",
+    description: "Tie work to measurable outcomes and team goals.",
+    keyResults: [
+      { id: "seed-kr-impact-1", text: "Highlight meaningful wins and operational improvements." }
+    ]
+  }
+];
 
 const seededCompetencyCategories: CompetencyCategory[] = [
   {
@@ -126,19 +157,20 @@ function startOfYear(date: Date) {
 
 function buildStateFromParts(input: {
   accomplishments: Accomplishment[];
-  draftGoals: string;
+  goalObjectives: GoalObjective[];
   competencyCategories: CompetencyCategory[];
   competencyLevel: CompetencyLevel;
 }) {
   const framework = [
-    ...parseList(input.draftGoals, "goal"),
+    ...flattenGoalObjectives(input.goalObjectives),
     ...flattenCompetencyCategories(input.competencyCategories)
   ];
 
   return {
     framework,
     accomplishments: input.accomplishments,
-    draftGoals: input.draftGoals,
+    draftGoals: serializeGoalObjectives(input.goalObjectives),
+    goalObjectives: input.goalObjectives,
     draftCompetencies: serializeCompetencyCategories(input.competencyCategories),
     competencyLevel: input.competencyLevel,
     competencyCategories: input.competencyCategories
@@ -147,7 +179,7 @@ function buildStateFromParts(input: {
 
 function seedState(): StoredState {
   const framework = [
-    ...parseList(seededGoals, "goal"),
+    ...flattenGoalObjectives(seededGoalObjectives),
     ...flattenCompetencyCategories(seededCompetencyCategories)
   ];
 
@@ -162,7 +194,8 @@ function seedState(): StoredState {
 
   return {
     framework,
-    draftGoals: seededGoals,
+    draftGoals: serializeGoalObjectives(seededGoalObjectives),
+    goalObjectives: seededGoalObjectives,
     draftCompetencies: serializeCompetencyCategories(seededCompetencyCategories),
     competencyLevel: "L2",
     competencyCategories: seededCompetencyCategories,
@@ -212,12 +245,12 @@ function coerceStoredState(value: Partial<StoredState> | null | undefined): Stor
     value.competencyCategories ??
     parseLegacyCompetencies(value.draftCompetencies ?? "");
   const competencyLevel = value.competencyLevel ?? getDefaultCompetencyLevel();
-  const draftGoals = value.draftGoals ?? seededGoals;
+  const goalObjectives = value.goalObjectives ?? parseLegacyGoals(value.draftGoals ?? "");
   const accomplishments = value.accomplishments ?? [];
 
   return buildStateFromParts({
     accomplishments,
-    draftGoals,
+    goalObjectives,
     competencyCategories,
     competencyLevel
   });
@@ -226,7 +259,7 @@ function coerceStoredState(value: Partial<StoredState> | null | undefined): Stor
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [framework, setFramework] = useState<FrameworkItem[]>([]);
   const [accomplishments, setAccomplishments] = useState<Accomplishment[]>([]);
-  const [draftGoals, setDraftGoals] = useState(seededGoals);
+  const [goalObjectives, setGoalObjectives] = useState<GoalObjective[]>([]);
   const [competencyLevel, setCompetencyLevel] = useState<CompetencyLevel>(getDefaultCompetencyLevel());
   const [competencyCategories, setCompetencyCategories] = useState<CompetencyCategory[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -246,7 +279,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     setFramework(nextState.framework);
     setAccomplishments(nextState.accomplishments);
-    setDraftGoals(nextState.draftGoals);
+    setGoalObjectives(nextState.goalObjectives ?? []);
     setCompetencyLevel(nextState.competencyLevel ?? getDefaultCompetencyLevel());
     setCompetencyCategories(nextState.competencyCategories ?? []);
     setLoaded(true);
@@ -259,14 +292,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const state = buildStateFromParts({
       accomplishments,
-      draftGoals,
+      goalObjectives,
       competencyCategories,
       competencyLevel
     });
 
     setFramework(state.framework);
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [accomplishments, competencyCategories, competencyLevel, draftGoals, loaded]);
+  }, [accomplishments, competencyCategories, competencyLevel, goalObjectives, loaded]);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -354,14 +387,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         skipNextSyncRef.current = true;
         setFramework(nextState.framework);
         setAccomplishments(nextState.accomplishments);
-        setDraftGoals(nextState.draftGoals);
+        setGoalObjectives(nextState.goalObjectives ?? []);
         setCompetencyLevel(nextState.competencyLevel ?? getDefaultCompetencyLevel());
         setCompetencyCategories(nextState.competencyCategories ?? []);
         setSyncStatus(`Signed in as ${userEmail}. Cloud data loaded.`);
       } else {
         const localState = buildStateFromParts({
           accomplishments,
-          draftGoals,
+          goalObjectives,
           competencyCategories,
           competencyLevel
         });
@@ -389,7 +422,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [accomplishments, competencyCategories, competencyLevel, draftGoals, loaded, user]);
+  }, [accomplishments, competencyCategories, competencyLevel, goalObjectives, loaded, user]);
 
   useEffect(() => {
     const supabaseClient = getSupabaseBrowserClient();
@@ -413,7 +446,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const state = buildStateFromParts({
       accomplishments,
-      draftGoals,
+      goalObjectives,
       competencyCategories,
       competencyLevel
     });
@@ -437,7 +470,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [accomplishments, competencyCategories, competencyLevel, draftGoals, loaded, user]);
+  }, [accomplishments, competencyCategories, competencyLevel, goalObjectives, loaded, user]);
 
   const goals = useMemo(() => framework.filter((item) => item.kind === "goal"), [framework]);
   const competencies = useMemo(
@@ -454,8 +487,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     });
   }, [accomplishments, today]);
 
-  function saveGoals(raw: string) {
-    setDraftGoals(raw);
+  function saveGoals(payload: SaveGoalsPayload) {
+    setGoalObjectives(payload.goalObjectives);
   }
 
   function saveCompetencies(payload: SaveCompetenciesPayload) {
@@ -531,8 +564,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     competencyCategories,
     competencyLevel,
     currentYearAccomplishments,
-    draftGoals,
+    draftGoals: serializeGoalObjectives(goalObjectives),
     framework,
+    goalObjectives,
     goals,
     isCloudConfigured: hasCloud,
     loaded,
