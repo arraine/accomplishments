@@ -128,7 +128,14 @@ body {
   margin: 0;
   min-height: 100vh;
   color: var(--text);
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family:
+    "Inter",
+    "SF Pro Text",
+    "Segoe UI",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  line-height: 1.5;
 }
 
 a {
@@ -176,8 +183,9 @@ button {
 }
 
 .brand-mark {
-  font-size: 0.95rem;
-  letter-spacing: 0.08em;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--primary-strong);
 }
@@ -380,8 +388,9 @@ button {
 .hero-copy-block h1 {
   max-width: 12ch;
   margin: 0;
-  font-size: clamp(3.2rem, 8vw, 6.4rem);
-  line-height: 0.92;
+  font-size: clamp(2.4rem, 6vw, 4.4rem);
+  font-weight: 700;
+  line-height: 0.98;
   letter-spacing: -0.04em;
 }
 
@@ -400,8 +409,8 @@ button {
   max-width: 60ch;
   margin: 16px 0 0;
   color: var(--muted);
-  font-size: 1.04rem;
-  line-height: 1.75;
+  font-size: 0.98rem;
+  line-height: 1.65;
 }
 
 .stats-grid,
@@ -445,7 +454,8 @@ button {
 .stat-card strong {
   display: block;
   margin-top: 8px;
-  font-size: 2.3rem;
+  font-size: 1.85rem;
+  font-weight: 700;
 }
 
 .assistant-banner {
@@ -485,6 +495,24 @@ details li {
 .log-card h3,
 .empty-state h3 {
   margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.panel-heading h2 {
+  font-size: 1.35rem;
+}
+
+.summary-card h3,
+.log-card h3,
+.empty-state h3,
+.category-head h3 {
+  font-size: 1.1rem;
+}
+
+.category-head h4 {
+  font-size: 0.98rem;
+  font-weight: 700;
 }
 
 .panel-heading p {
