@@ -1,6 +1,14 @@
 "use client";
 
-import type { Accomplishment, DraftLinks, FrameworkItem, ItemKind, SuggestedMatch } from "./types";
+import type {
+  Accomplishment,
+  CompetencyCategory,
+  CompetencyLevel,
+  DraftLinks,
+  FrameworkItem,
+  ItemKind,
+  SuggestedMatch
+} from "./types";
 
 function createId() {
   return crypto.randomUUID();
@@ -29,6 +37,64 @@ export function parseList(raw: string, kind: ItemKind): FrameworkItem[] {
         kind
       };
     });
+}
+
+export function flattenCompetencyCategories(categories: CompetencyCategory[]): FrameworkItem[] {
+  return categories.flatMap((category) =>
+    category.competencies.map((competency) => ({
+      id: competency.id,
+      name: competency.name,
+      description: competency.description,
+      kind: "competency" as const,
+      categoryId: category.id,
+      categoryName: category.name
+    }))
+  );
+}
+
+export function serializeCompetencyCategories(categories: CompetencyCategory[]) {
+  return categories
+    .map((category) => {
+      const lines = category.competencies.map((competency) =>
+        competency.description
+          ? `- ${competency.name}: ${competency.description}`
+          : `- ${competency.name}`
+      );
+
+      return [category.name, ...lines].join("\n");
+    })
+    .join("\n\n");
+}
+
+export function parseLegacyCompetencies(raw: string): CompetencyCategory[] {
+  const lines = raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (!lines.length) {
+    return [];
+  }
+
+  return [
+    {
+      id: crypto.randomUUID(),
+      name: "Core competencies",
+      competencies: lines.map((line) => {
+        const [name, ...rest] = line.split(":");
+
+        return {
+          id: crypto.randomUUID(),
+          name: name.trim(),
+          description: rest.join(":").trim()
+        };
+      })
+    }
+  ];
+}
+
+export function getDefaultCompetencyLevel(): CompetencyLevel {
+  return "L1";
 }
 
 export function normalizeText(value: string) {

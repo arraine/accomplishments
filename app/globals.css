@@ -715,6 +715,45 @@ summary {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
+.level-row,
+.editor-actions,
+.category-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.category-stack,
+.competency-stack {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.category-card,
+.competency-card {
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.18);
+  padding: 18px;
+}
+
+.category-head {
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.category-head h3,
+.category-head h4 {
+  margin: 0;
+}
+
+.editor-actions {
+  justify-content: space-between;
+  margin-top: 18px;
+}
+
 @media (max-width: 1024px) {
   .app-grid {
     grid-template-columns: 1fr;
@@ -728,7 +767,9 @@ summary {
 
   .assistant-banner,
   .log-header,
-  .summary-toolbar {
+  .summary-toolbar,
+  .editor-actions,
+  .category-head {
     grid-template-columns: 1fr;
     display: grid;
   }

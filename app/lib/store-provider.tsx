@@ -13,30 +13,46 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import {
-  formatAssistantNote,
-  getTodayString,
-  parseList,
   classifyAccomplishment,
-  normalizeText
+  flattenCompetencyCategories,
+  formatAssistantNote,
+  getDefaultCompetencyLevel,
+  getTodayString,
+  normalizeText,
+  parseLegacyCompetencies,
+  parseList,
+  serializeCompetencyCategories
 } from "./store";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "./supabase";
-import type { Accomplishment, FrameworkItem, StoredState } from "./types";
+import type {
+  Accomplishment,
+  CompetencyCategory,
+  CompetencyLevel,
+  FrameworkItem,
+  StoredState
+} from "./types";
 
 type AuthMode = "idle" | "signing-in" | "signing-up" | "signed-in";
+
+type SaveCompetenciesPayload = {
+  competencyCategories: CompetencyCategory[];
+  competencyLevel: CompetencyLevel;
+};
 
 type StoreContextValue = {
   accomplishments: Accomplishment[];
   authError: string | null;
   authMode: AuthMode;
   competencies: FrameworkItem[];
+  competencyCategories: CompetencyCategory[];
+  competencyLevel: CompetencyLevel;
   currentYearAccomplishments: Accomplishment[];
-  draftCompetencies: string;
   draftGoals: string;
   framework: FrameworkItem[];
   goals: FrameworkItem[];
   isCloudConfigured: boolean;
   loaded: boolean;
-  saveCompetencies: (raw: string) => void;
+  saveCompetencies: (payload: SaveCompetenciesPayload) => void;
   saveGoals: (raw: string) => void;
   session: Session | null;
   setAccomplishments: Dispatch<SetStateAction<Accomplishment[]>>;
@@ -57,12 +73,46 @@ const seededGoals = [
   "Create visible impact for the business"
 ].join("\n");
 
-const seededCompetencies = [
-  "Communication",
-  "Execution",
-  "Technical judgment",
-  "Ownership"
-].join("\n");
+const seededCompetencyCategories: CompetencyCategory[] = [
+  {
+    id: "seed-category-communication",
+    name: "Communication and influence",
+    competencies: [
+      {
+        id: "seed-competency-communication",
+        name: "Communication",
+        description: "Clearly align stakeholders around priorities, tradeoffs, and risks."
+      }
+    ]
+  },
+  {
+    id: "seed-category-delivery",
+    name: "Execution and ownership",
+    competencies: [
+      {
+        id: "seed-competency-execution",
+        name: "Execution",
+        description: "Translate plans into reliable delivery."
+      },
+      {
+        id: "seed-competency-ownership",
+        name: "Ownership",
+        description: "Take responsibility for outcomes and follow-through."
+      }
+    ]
+  },
+  {
+    id: "seed-category-judgment",
+    name: "Technical and strategic judgment",
+    competencies: [
+      {
+        id: "seed-competency-judgment",
+        name: "Technical judgment",
+        description: "Make sound decisions with incomplete information."
+      }
+    ]
+  }
+];
 
 const StoreContext = createContext<StoreContextValue | null>(null);
 
@@ -70,10 +120,35 @@ function createId() {
   return crypto.randomUUID();
 }
 
+function startOfYear(date: Date) {
+  return new Date(date.getFullYear(), 0, 1).getTime();
+}
+
+function buildStateFromParts(input: {
+  accomplishments: Accomplishment[];
+  draftGoals: string;
+  competencyCategories: CompetencyCategory[];
+  competencyLevel: CompetencyLevel;
+}) {
+  const framework = [
+    ...parseList(input.draftGoals, "goal"),
+    ...flattenCompetencyCategories(input.competencyCategories)
+  ];
+
+  return {
+    framework,
+    accomplishments: input.accomplishments,
+    draftGoals: input.draftGoals,
+    draftCompetencies: serializeCompetencyCategories(input.competencyCategories),
+    competencyLevel: input.competencyLevel,
+    competencyCategories: input.competencyCategories
+  } satisfies StoredState;
+}
+
 function seedState(): StoredState {
   const framework = [
     ...parseList(seededGoals, "goal"),
-    ...parseList(seededCompetencies, "competency")
+    ...flattenCompetencyCategories(seededCompetencyCategories)
   ];
 
   const firstLinks = classifyAccomplishment(
@@ -88,7 +163,9 @@ function seedState(): StoredState {
   return {
     framework,
     draftGoals: seededGoals,
-    draftCompetencies: seededCompetencies,
+    draftCompetencies: serializeCompetencyCategories(seededCompetencyCategories),
+    competencyLevel: "L2",
+    competencyCategories: seededCompetencyCategories,
     accomplishments: [
       {
         id: createId(),
@@ -126,37 +203,32 @@ function seedState(): StoredState {
   };
 }
 
-function getInitialState(): StoredState {
-  return {
-    accomplishments: [],
-    draftCompetencies: seededCompetencies,
-    draftGoals: seededGoals,
-    framework: []
-  };
-}
-
-function startOfYear(date: Date) {
-  return new Date(date.getFullYear(), 0, 1).getTime();
-}
-
 function coerceStoredState(value: Partial<StoredState> | null | undefined): StoredState {
   if (!value) {
     return seedState();
   }
 
-  return {
-    framework: value.framework ?? [],
-    accomplishments: value.accomplishments ?? [],
-    draftGoals: value.draftGoals ?? "",
-    draftCompetencies: value.draftCompetencies ?? ""
-  };
+  const competencyCategories =
+    value.competencyCategories ??
+    parseLegacyCompetencies(value.draftCompetencies ?? "");
+  const competencyLevel = value.competencyLevel ?? getDefaultCompetencyLevel();
+  const draftGoals = value.draftGoals ?? seededGoals;
+  const accomplishments = value.accomplishments ?? [];
+
+  return buildStateFromParts({
+    accomplishments,
+    draftGoals,
+    competencyCategories,
+    competencyLevel
+  });
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [framework, setFramework] = useState<FrameworkItem[]>([]);
   const [accomplishments, setAccomplishments] = useState<Accomplishment[]>([]);
   const [draftGoals, setDraftGoals] = useState(seededGoals);
-  const [draftCompetencies, setDraftCompetencies] = useState(seededCompetencies);
+  const [competencyLevel, setCompetencyLevel] = useState<CompetencyLevel>(getDefaultCompetencyLevel());
+  const [competencyCategories, setCompetencyCategories] = useState<CompetencyCategory[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -170,21 +242,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const saved = window.localStorage.getItem(STORAGE_KEY);
+    const nextState = saved ? coerceStoredState(JSON.parse(saved) as StoredState) : seedState();
 
-    if (!saved) {
-      const initial = seedState();
-      setFramework(initial.framework);
-      setAccomplishments(initial.accomplishments);
-      setLoaded(true);
-      return;
-    }
-
-    const parsed = JSON.parse(saved) as StoredState;
-    const nextState = coerceStoredState(parsed);
     setFramework(nextState.framework);
     setAccomplishments(nextState.accomplishments);
     setDraftGoals(nextState.draftGoals);
-    setDraftCompetencies(nextState.draftCompetencies);
+    setCompetencyLevel(nextState.competencyLevel ?? getDefaultCompetencyLevel());
+    setCompetencyCategories(nextState.competencyCategories ?? []);
     setLoaded(true);
   }, []);
 
@@ -193,15 +257,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const state: StoredState = {
-      framework,
+    const state = buildStateFromParts({
       accomplishments,
       draftGoals,
-      draftCompetencies
-    };
+      competencyCategories,
+      competencyLevel
+    });
 
+    setFramework(state.framework);
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [accomplishments, draftCompetencies, draftGoals, framework, loaded]);
+  }, [accomplishments, competencyCategories, competencyLevel, draftGoals, loaded]);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -290,15 +355,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setFramework(nextState.framework);
         setAccomplishments(nextState.accomplishments);
         setDraftGoals(nextState.draftGoals);
-        setDraftCompetencies(nextState.draftCompetencies);
+        setCompetencyLevel(nextState.competencyLevel ?? getDefaultCompetencyLevel());
+        setCompetencyCategories(nextState.competencyCategories ?? []);
         setSyncStatus(`Signed in as ${userEmail}. Cloud data loaded.`);
       } else {
-        const localState: StoredState = {
-          framework,
+        const localState = buildStateFromParts({
           accomplishments,
           draftGoals,
-          draftCompetencies
-        };
+          competencyCategories,
+          competencyLevel
+        });
 
         const { error: upsertError } = await supabase.from("user_state").upsert({
           user_id: userId,
@@ -318,12 +384,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       cloudLoadedUserIdRef.current = userId;
     }
 
-    loadCloudState();
+    void loadCloudState();
 
     return () => {
       cancelled = true;
     };
-  }, [accomplishments, draftCompetencies, draftGoals, framework, loaded, user]);
+  }, [accomplishments, competencyCategories, competencyLevel, draftGoals, loaded, user]);
 
   useEffect(() => {
     const supabaseClient = getSupabaseBrowserClient();
@@ -345,12 +411,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const state: StoredState = {
-      framework,
+    const state = buildStateFromParts({
       accomplishments,
       draftGoals,
-      draftCompetencies
-    };
+      competencyCategories,
+      competencyLevel
+    });
 
     const timeoutId = window.setTimeout(async () => {
       const { error } = await supabase.from("user_state").upsert({
@@ -371,12 +437,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [accomplishments, draftCompetencies, draftGoals, framework, loaded, user]);
+  }, [accomplishments, competencyCategories, competencyLevel, draftGoals, loaded, user]);
 
-  const goals = useMemo(
-    () => framework.filter((item) => item.kind === "goal"),
-    [framework]
-  );
+  const goals = useMemo(() => framework.filter((item) => item.kind === "goal"), [framework]);
   const competencies = useMemo(
     () => framework.filter((item) => item.kind === "competency"),
     [framework]
@@ -392,17 +455,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [accomplishments, today]);
 
   function saveGoals(raw: string) {
-    const goalItems = parseList(raw, "goal");
-    const competencyItems = framework.filter((item) => item.kind === "competency");
     setDraftGoals(raw);
-    setFramework([...goalItems, ...competencyItems]);
   }
 
-  function saveCompetencies(raw: string) {
-    const goalItems = framework.filter((item) => item.kind === "goal");
-    const competencyItems = parseList(raw, "competency");
-    setDraftCompetencies(raw);
-    setFramework([...goalItems, ...competencyItems]);
+  function saveCompetencies(payload: SaveCompetenciesPayload) {
+    setCompetencyLevel(payload.competencyLevel);
+    setCompetencyCategories(payload.competencyCategories);
   }
 
   async function signIn(email: string, password: string) {
@@ -413,11 +471,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const supabase = supabaseClient;
-
     setAuthMode("signing-in");
     setAuthError(null);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
 
     if (error) {
       setAuthError(error.message);
@@ -436,11 +492,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const supabase = supabaseClient;
-
     setAuthMode("signing-up");
     setAuthError(null);
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabaseClient.auth.signUp({ email, password });
 
     if (error) {
       setAuthError(error.message);
@@ -463,9 +517,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const supabase = supabaseClient;
-
-    await supabase.auth.signOut();
+    await supabaseClient.auth.signOut();
     setSession(null);
     setUser(null);
     setAuthMode("idle");
@@ -476,8 +528,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     authError,
     authMode,
     competencies,
+    competencyCategories,
+    competencyLevel,
     currentYearAccomplishments,
-    draftCompetencies,
     draftGoals,
     framework,
     goals,
