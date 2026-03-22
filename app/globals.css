@@ -553,13 +553,47 @@ button {
   gap: 18px;
 }
 
+.entry-layout,
+.secondary-home-grid,
+.entry-support-grid,
+.mini-stat-list,
+.side-summary {
+  display: grid;
+  gap: 18px;
+}
+
 .stats-grid {
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.compact-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .app-grid {
   grid-template-columns: minmax(330px, 460px) minmax(0, 1fr);
   align-items: start;
+}
+
+.entry-layout {
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  align-items: start;
+  margin-bottom: 20px;
+}
+
+.secondary-home-grid {
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  align-items: start;
+}
+
+.entry-hero {
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  align-items: center;
+}
+
+.entry-hero-side {
+  display: grid;
+  gap: 16px;
 }
 
 .stat-card,
@@ -661,6 +695,25 @@ details li {
   padding: 24px;
 }
 
+.entry-panel {
+  padding: 28px;
+}
+
+.entry-panel-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.side-panel {
+  position: sticky;
+  top: 96px;
+}
+
 .panel-heading h2,
 .summary-card h3,
 .log-card h3,
@@ -704,6 +757,44 @@ details li {
 .chip-groups {
   display: grid;
   gap: 16px;
+}
+
+.spotlight-entry-form textarea {
+  min-height: 180px;
+  font-size: 1.02rem;
+}
+
+.entry-support-grid {
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.entry-help-card,
+.mini-stat {
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.22);
+  padding: 16px;
+}
+
+.entry-help-card p:last-child,
+.mini-stat span {
+  margin: 0;
+  color: var(--muted);
+}
+
+.mini-stat-list {
+  grid-template-columns: 1fr;
+}
+
+.mini-stat strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.45rem;
+}
+
+.compact-empty {
+  padding: 16px;
 }
 
 label {
@@ -989,6 +1080,18 @@ summary {
 @media (max-width: 1024px) {
   .app-grid {
     grid-template-columns: 1fr;
+  }
+
+  .entry-layout,
+  .secondary-home-grid,
+  .entry-hero,
+  .entry-support-grid,
+  .compact-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .side-panel {
+    position: static;
   }
 }
 

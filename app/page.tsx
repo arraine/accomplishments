@@ -180,84 +180,80 @@ export default function Home() {
 
   return (
     <main className="page-shell">
-      <section className="hero">
+      <section className="hero entry-hero">
         <div className="hero-copy-block">
-          <p className="eyebrow">Home</p>
-          <h1>Record what you accomplished today.</h1>
+          <p className="eyebrow">home</p>
+          <h1>record what you accomplished today.</h1>
           <p className="hero-copy">
-            Use this page for daily capture. Goals and competencies each have their own pages now,
-            and the assistant still links everything together for summaries.
+            This page is built for fast capture first. Add the win while it is still fresh, then
+            let the assistant organize it against your goals and competencies.
           </p>
         </div>
 
-        <div className="stats-grid">
-          <article className="stat-card">
-            <span>Tracked entries</span>
-            <strong>{dashboardStats.entries}</strong>
-          </article>
-          <article className="stat-card">
-            <span>Total occurrences</span>
-            <strong>{dashboardStats.totalCount}</strong>
-          </article>
-          <article className="stat-card">
-            <span>Linked entries</span>
-            <strong>{dashboardStats.linkedCount}</strong>
-          </article>
-          <article className="stat-card">
-            <span>Goals covered</span>
-            <strong>{dashboardStats.goalsCovered}</strong>
-          </article>
+        <div className="entry-hero-side">
+          <div className="stats-grid compact-stats">
+            <article className="stat-card">
+              <span>Tracked entries</span>
+              <strong>{dashboardStats.entries}</strong>
+            </article>
+            <article className="stat-card">
+              <span>Total occurrences</span>
+              <strong>{dashboardStats.totalCount}</strong>
+            </article>
+            <article className="stat-card">
+              <span>Linked entries</span>
+              <strong>{dashboardStats.linkedCount}</strong>
+            </article>
+            <article className="stat-card">
+              <span>Goals covered</span>
+              <strong>{dashboardStats.goalsCovered}</strong>
+            </article>
+          </div>
         </div>
       </section>
 
-      <section className="assistant-banner">
-        <div>
-          <p className="assistant-label">Assistant status</p>
-          <p className="assistant-message">{message}</p>
-        </div>
-        <div className="assistant-meta">
-          <p className="assistant-date">Current log date: {formatFriendlyDate(entryDate)}</p>
-          <p className="assistant-date">
-            {isAnalyzing
-              ? "Analyzing with OpenAI..."
-              : "Manual links override assistant suggestions."}
-          </p>
-        </div>
-      </section>
+      <section className="entry-layout">
+        <article className="panel entry-panel">
+          <div className="panel-heading">
+            <h2>Daily entry</h2>
+            <p>Manual links take priority. If none are selected, the assistant suggests them.</p>
+          </div>
 
-      <section className="app-grid">
-        <div className="panel-stack">
-          <article className="panel">
-            <div className="panel-heading">
-              <h2>Daily entry</h2>
-              <p>Manual links take priority. If none are selected, the assistant suggests them.</p>
-            </div>
+          <div className="entry-panel-meta">
+            <p className="assistant-date">Current log date: {formatFriendlyDate(entryDate)}</p>
+            <p className="assistant-date">
+              {isAnalyzing
+                ? "Analyzing with OpenAI..."
+                : "Manual links override assistant suggestions."}
+            </p>
+          </div>
 
-            {!goals.length || !competencies.length ? (
-              <div className="callout">
-                <p>
-                  The assistant works best once your framework is defined.
-                  {!goals.length ? " Add goals." : ""}
-                  {!competencies.length ? " Add competencies." : ""}
-                </p>
-                <div className="inline-links">
-                  <Link href="/goals">Open goals</Link>
-                  <Link href="/competencies">Open competencies</Link>
-                </div>
+          {!goals.length || !competencies.length ? (
+            <div className="callout">
+              <p>
+                The assistant works best once your framework is defined.
+                {!goals.length ? " Add goals." : ""}
+                {!competencies.length ? " Add competencies." : ""}
+              </p>
+              <div className="inline-links">
+                <Link href="/goals">Open goals</Link>
+                <Link href="/competencies">Open competencies</Link>
               </div>
-            ) : null}
+            </div>
+          ) : null}
 
-            <form className="entry-form" onSubmit={handleEntrySubmit}>
-              <label>
-                Accomplishment
-                <textarea
-                  value={entryText}
-                  onChange={(event) => setEntryText(event.target.value)}
-                  rows={5}
-                  placeholder="Example: Led a project risk review that unblocked launch planning."
-                />
-              </label>
+          <form className="entry-form spotlight-entry-form" onSubmit={handleEntrySubmit}>
+            <label>
+              Accomplishment
+              <textarea
+                value={entryText}
+                onChange={(event) => setEntryText(event.target.value)}
+                rows={7}
+                placeholder="Example: Led a project risk review that unblocked launch planning."
+              />
+            </label>
 
+            <div className="entry-support-grid">
               <label>
                 Date
                 <input
@@ -267,84 +263,110 @@ export default function Home() {
                 />
               </label>
 
-              <div className="selection-block">
-                <p>Optional manual links</p>
-                <div className="chip-groups">
-                  <div>
-                    <span className="group-label">Goals</span>
-                    <div className="chip-row">
-                      {goals.length ? (
-                        goals.map((goal) => (
-                          <button
-                            key={goal.id}
-                            type="button"
-                            className={selectedGoals.includes(goal.id) ? "chip active" : "chip"}
-                            onClick={() => toggleSelection(goal.id, "goal")}
-                          >
-                            {goal.name}
-                          </button>
-                        ))
-                      ) : (
-                        <span className="empty-inline">No goals yet</span>
-                      )}
-                    </div>
-                  </div>
+              <div className="entry-help-card">
+                <p className="assistant-label">Quick note</p>
+                <p>
+                  Keep it simple. A short sentence about the outcome is enough, and the assistant
+                  can help with categorization.
+                </p>
+              </div>
+            </div>
 
-                  <div>
-                    <span className="group-label">Competencies</span>
-                    <div className="chip-row">
-                      {competencies.length ? (
-                        competencies.map((competency) => (
-                          <button
-                            key={competency.id}
-                            type="button"
-                            className={
-                              selectedCompetencies.includes(competency.id) ? "chip active" : "chip"
-                            }
-                            onClick={() => toggleSelection(competency.id, "competency")}
-                          >
-                            {competency.name}
-                          </button>
-                        ))
-                      ) : (
-                        <span className="empty-inline">No competencies yet</span>
-                      )}
-                    </div>
+            <div className="selection-block">
+              <p>Optional manual links</p>
+              <div className="chip-groups">
+                <div>
+                  <span className="group-label">Goals</span>
+                  <div className="chip-row">
+                    {goals.length ? (
+                      goals.map((goal) => (
+                        <button
+                          key={goal.id}
+                          type="button"
+                          className={selectedGoals.includes(goal.id) ? "chip active" : "chip"}
+                          onClick={() => toggleSelection(goal.id, "goal")}
+                        >
+                          {goal.name}
+                        </button>
+                      ))
+                    ) : (
+                      <span className="empty-inline">No goals yet</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="group-label">Competencies</span>
+                  <div className="chip-row">
+                    {competencies.length ? (
+                      competencies.map((competency) => (
+                        <button
+                          key={competency.id}
+                          type="button"
+                          className={
+                            selectedCompetencies.includes(competency.id) ? "chip active" : "chip"
+                          }
+                          onClick={() => toggleSelection(competency.id, "competency")}
+                        >
+                          {competency.name}
+                        </button>
+                      ))
+                    ) : (
+                      <span className="empty-inline">No competencies yet</span>
+                    )}
                   </div>
                 </div>
               </div>
-
-              <button className="primary-button" type="submit" disabled={isAnalyzing}>
-                {isAnalyzing ? "Analyzing..." : "Log accomplishment"}
-              </button>
-            </form>
-          </article>
-
-          <article className="panel">
-            <div className="panel-heading">
-              <h2>Current-year summary</h2>
-              <p>Entries from January 1 through today, ready for review conversations.</p>
             </div>
 
-            <div className="summary-list compact">
-              {currentYearAccomplishments.length ? (
-                currentYearAccomplishments.map((item) => (
-                  <article key={item.id} className="summary-card">
-                    <h3>{item.text}</h3>
-                    <p>{formatFriendlyDate(item.date)}</p>
-                    <span className="summary-meta">Occurrences: {item.count}</span>
-                  </article>
-                ))
-              ) : (
-                <div className="empty-state">
-                  <h3>No summary items yet</h3>
-                  <p>Log your first accomplishment to start building year-to-date evidence.</p>
-                </div>
-              )}
-            </div>
-          </article>
-        </div>
+            <button className="primary-button" type="submit" disabled={isAnalyzing}>
+              {isAnalyzing ? "Analyzing..." : "Log accomplishment"}
+            </button>
+          </form>
+        </article>
 
+        <aside className="panel side-panel">
+          <div className="panel-heading">
+            <h2>Today at a glance</h2>
+            <p>Helpful context while you capture, without taking over the page.</p>
+          </div>
+
+          <div className="mini-stat-list">
+            <article className="mini-stat">
+              <span>Current-year entries</span>
+              <strong>{currentYearAccomplishments.length}</strong>
+            </article>
+            <article className="mini-stat">
+              <span>Total logged wins</span>
+              <strong>{dashboardStats.totalCount}</strong>
+            </article>
+            <article className="mini-stat">
+              <span>Goals represented</span>
+              <strong>{dashboardStats.goalsCovered}</strong>
+            </article>
+          </div>
+
+          <div className="side-summary">
+            <p className="assistant-label">Recent review-ready items</p>
+            {currentYearAccomplishments.length ? (
+              currentYearAccomplishments.slice(0, 3).map((item) => (
+                <article key={item.id} className="summary-card">
+                  <h3>{item.text}</h3>
+                  <p>{formatFriendlyDate(item.date)}</p>
+                  <span className="summary-meta">Occurrences: {item.count}</span>
+                </article>
+              ))
+            ) : (
+              <div className="empty-state compact-empty">
+                <h3>No summary items yet</h3>
+                <p>Once you start logging, your strongest recent items will show up here.</p>
+              </div>
+            )}
+          </div>
+        </aside>
+      </section>
+
+      <section className="secondary-home-grid">
         <article className="panel">
           <div className="panel-heading">
             <h2>Accomplishment log</h2>
@@ -394,6 +416,30 @@ export default function Home() {
               <div className="empty-state">
                 <h3>No accomplishments recorded</h3>
                 <p>The assistant will acknowledge, categorize, and summarize entries here.</p>
+              </div>
+            )}
+          </div>
+        </article>
+
+        <article className="panel">
+          <div className="panel-heading">
+            <h2>Current-year summary</h2>
+            <p>Entries from January 1 through today, ready for review conversations.</p>
+          </div>
+
+          <div className="summary-list compact">
+            {currentYearAccomplishments.length ? (
+              currentYearAccomplishments.map((item) => (
+                <article key={item.id} className="summary-card">
+                  <h3>{item.text}</h3>
+                  <p>{formatFriendlyDate(item.date)}</p>
+                  <span className="summary-meta">Occurrences: {item.count}</span>
+                </article>
+              ))
+            ) : (
+              <div className="empty-state">
+                <h3>No summary items yet</h3>
+                <p>Log your first accomplishment to start building year-to-date evidence.</p>
               </div>
             )}
           </div>
