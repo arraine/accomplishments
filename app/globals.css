@@ -1077,6 +1077,16 @@ summary {
   margin-top: 18px;
 }
 
+.save-notice {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--callout-bg);
+  color: var(--primary-strong);
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+
 @media (max-width: 1024px) {
   .app-grid {
     grid-template-columns: 1fr;

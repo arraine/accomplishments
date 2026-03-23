@@ -30,6 +30,7 @@ export default function CompetenciesPage() {
   } = useAccomplishmentsStore();
   const [level, setLevel] = useState<CompetencyLevel>(competencyLevel);
   const [categories, setCategories] = useState<CompetencyCategory[]>(competencyCategories);
+  const [showSavedNotice, setShowSavedNotice] = useState(false);
   const [message, setMessage] = useState(
     "Set your level, define competency categories, and list the competencies that belong in each category."
   );
@@ -38,6 +39,20 @@ export default function CompetenciesPage() {
     setLevel(competencyLevel);
     setCategories(competencyCategories);
   }, [competencyCategories, competencyLevel]);
+
+  useEffect(() => {
+    if (!showSavedNotice) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShowSavedNotice(false);
+    }, 2600);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [showSavedNotice]);
 
   if (!loaded) {
     return (
@@ -141,6 +156,7 @@ export default function CompetenciesPage() {
       competencyLevel: level,
       competencyCategories: cleanedCategories
     });
+    setShowSavedNotice(true);
     setMessage(
       "Competency framework saved. The assistant will use your selected level and categorized competencies for future entries."
     );
@@ -295,6 +311,11 @@ export default function CompetenciesPage() {
           </div>
 
           <div className="editor-actions">
+            {showSavedNotice ? (
+              <div className="save-notice" role="status" aria-live="polite">
+                Competencies saved
+              </div>
+            ) : null}
             <button
               type="button"
               className="secondary-button"

@@ -23,6 +23,7 @@ export default function GoalsPage() {
     saveGoals
   } = useAccomplishmentsStore();
   const [objectives, setObjectives] = useState<GoalObjective[]>(goalObjectives);
+  const [showSavedNotice, setShowSavedNotice] = useState(false);
   const [message, setMessage] = useState(
     "Define each goal as an objective, then add the key results that indicate progress against it."
   );
@@ -30,6 +31,20 @@ export default function GoalsPage() {
   useEffect(() => {
     setObjectives(goalObjectives);
   }, [goalObjectives]);
+
+  useEffect(() => {
+    if (!showSavedNotice) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShowSavedNotice(false);
+    }, 2600);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [showSavedNotice]);
 
   if (!loaded) {
     return (
@@ -117,6 +132,7 @@ export default function GoalsPage() {
       .filter((objective) => objective.objective);
 
     saveGoals({ goalObjectives: cleanedObjectives });
+    setShowSavedNotice(true);
     setMessage(
       "Goals saved as OKRs. The assistant will now categorize accomplishments against your objectives."
     );
@@ -247,6 +263,11 @@ export default function GoalsPage() {
           </div>
 
           <div className="editor-actions">
+            {showSavedNotice ? (
+              <div className="save-notice" role="status" aria-live="polite">
+                Goals saved
+              </div>
+            ) : null}
             <button
               type="button"
               className="secondary-button"
