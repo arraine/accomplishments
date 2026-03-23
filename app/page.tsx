@@ -25,6 +25,29 @@ type DraftLinks = {
   competencies: string[];
 };
 
+type CategorizationDebugState = {
+  source: "manual" | "openai" | "fallback" | "clarification" | "top-suggestions";
+  accomplishment: string;
+  frameworkCount: number;
+  openAiStatus: "not-used" | "success" | "error";
+  openAiError: string;
+  clarificationAnswer: string;
+  resultType: "direct" | "clarification" | "none";
+  assistantNote: string;
+  clarificationQuestion: string;
+  llmGoalIds: string[];
+  llmCompetencyIds: string[];
+  fallbackGoalIds: string[];
+  fallbackCompetencyIds: string[];
+  finalGoalIds: string[];
+  finalCompetencyIds: string[];
+};
+
+type CategorizationResponse = {
+  data: LlmCategorizationResult | null;
+  error: string;
+};
+
 export default function Home() {
   const {
     accomplishments,
@@ -47,6 +70,7 @@ export default function Home() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [clarificationAnswer, setClarificationAnswer] = useState("");
   const [pendingClarification, setPendingClarification] = useState<PendingClarification | null>(null);
+  const [categorizationDebug, setCategorizationDebug] = useState<CategorizationDebugState | null>(null);
   const [message, setMessage] = useState(
     "Acting as your accomplishments assistant. Record what you did, and I’ll keep the log organized against your goals and competencies."
   );
@@ -144,7 +168,7 @@ export default function Home() {
   async function fetchLlmCategorization(
     accomplishment: string,
     clarification?: string
-  ): Promise<LlmCategorizationResult | null> {
+  ): Promise<CategorizationResponse> {
     const response = await fetch("/api/categorize", {
       method: "POST",
       headers: {
@@ -161,10 +185,31 @@ export default function Home() {
     });
 
     if (!response.ok) {
-      return null;
+      let errorMessage = "Categorization request failed.";
+
+      try {
+        const payload = (await response.json()) as { error?: string };
+        errorMessage = payload.error || errorMessage;
+      } catch {}
+
+      return {
+        data: null,
+        error: errorMessage
+      };
     }
 
-    return (await response.json()) as LlmCategorizationResult;
+    return {
+      data: (await response.json()) as LlmCategorizationResult,
+      error: ""
+    };
+  }
+
+  function resolveLinkNames(ids: string[], type: "goal" | "competency") {
+    const items = type === "goal" ? goals : competencies;
+
+    return ids
+      .map((id) => items.find((item) => item.id === id)?.name)
+      .filter((name): name is string => Boolean(name));
   }
 
   function resetEntryComposer() {
@@ -175,6 +220,10 @@ export default function Home() {
     setCompetencyQuery("");
     setPendingClarification(null);
     setClarificationAnswer("");
+  }
+
+  function updateCategorizationDebug(nextDebug: CategorizationDebugState) {
+    setCategorizationDebug(nextDebug);
   }
 
   function saveEntry(
@@ -257,10 +306,11 @@ export default function Home() {
     setIsAnalyzing(true);
 
     try {
-      const llmSuggested =
+      const llmResponse =
         framework.length && !selectedGoals.length && !selectedCompetencies.length
           ? await fetchLlmCategorization(trimmed)
-          : null;
+          : { data: null, error: "" };
+      const llmSuggested = llmResponse.data;
       const suggested = framework.length ? classifyAccomplishment(trimmed, framework) : null;
       const draftLinks = {
         goals: selectedGoals.length
@@ -274,6 +324,31 @@ export default function Home() {
             ? llmSuggested.suggestedCompetencyIds
             : suggested?.competencies ?? []
       };
+
+      updateCategorizationDebug({
+        source: selectedGoals.length || selectedCompetencies.length
+          ? "manual"
+          : llmSuggested?.suggestedGoalIds.length || llmSuggested?.suggestedCompetencyIds.length
+            ? "openai"
+            : suggested?.goals.length || suggested?.competencies.length
+              ? "fallback"
+              : "fallback",
+        accomplishment: trimmed,
+        frameworkCount: framework.length,
+        openAiStatus: llmSuggested ? "success" : llmResponse.error ? "error" : "not-used",
+        openAiError: llmResponse.error,
+        clarificationAnswer: "",
+        resultType: llmSuggested?.resultType ?? "none",
+        assistantNote: llmSuggested?.assistantNote ?? "",
+        clarificationQuestion: llmSuggested?.clarificationQuestion ?? "",
+        llmGoalIds: llmSuggested?.suggestedGoalIds ?? [],
+        llmCompetencyIds: llmSuggested?.suggestedCompetencyIds ?? [],
+        fallbackGoalIds: suggested?.goals ?? [],
+        fallbackCompetencyIds: suggested?.competencies ?? [],
+        finalGoalIds: draftLinks.goals,
+        finalCompetencyIds: draftLinks.competencies
+      });
+
       if (llmSuggested?.resultType === "clarification" && llmSuggested.clarificationQuestion) {
         setPendingClarification({
           accomplishment: trimmed,
@@ -303,10 +378,11 @@ export default function Home() {
     setIsAnalyzing(true);
 
     try {
-      const llmSuggested = await fetchLlmCategorization(
+      const llmResponse = await fetchLlmCategorization(
         pendingClarification.accomplishment,
         clarificationAnswer
       );
+      const llmSuggested = llmResponse.data;
       const fallbackSuggested = framework.length
         ? classifyAccomplishment(pendingClarification.accomplishment, framework)
         : null;
@@ -324,6 +400,24 @@ export default function Home() {
               ? pendingClarification.suggestedCompetencyIds
               : fallbackSuggested?.competencies ?? []
       };
+
+      updateCategorizationDebug({
+        source: "clarification",
+        accomplishment: pendingClarification.accomplishment,
+        frameworkCount: framework.length,
+        openAiStatus: llmSuggested ? "success" : llmResponse.error ? "error" : "not-used",
+        openAiError: llmResponse.error,
+        clarificationAnswer,
+        resultType: llmSuggested?.resultType ?? "none",
+        assistantNote: llmSuggested?.assistantNote ?? "",
+        clarificationQuestion: llmSuggested?.clarificationQuestion ?? "",
+        llmGoalIds: llmSuggested?.suggestedGoalIds ?? [],
+        llmCompetencyIds: llmSuggested?.suggestedCompetencyIds ?? [],
+        fallbackGoalIds: fallbackSuggested?.goals ?? [],
+        fallbackCompetencyIds: fallbackSuggested?.competencies ?? [],
+        finalGoalIds: draftLinks.goals,
+        finalCompetencyIds: draftLinks.competencies
+      });
 
       if (llmSuggested?.resultType === "clarification" && llmSuggested.clarificationQuestion) {
         setPendingClarification({
@@ -586,6 +680,23 @@ export default function Home() {
                             clarificationQuestion: ""
                           }
                         );
+                        updateCategorizationDebug({
+                          source: "top-suggestions",
+                          accomplishment: pendingClarification.accomplishment,
+                          frameworkCount: framework.length,
+                          openAiStatus: "success",
+                          openAiError: "",
+                          clarificationAnswer,
+                          resultType: "direct",
+                          assistantNote: "Recorded using the assistant's best current suggestions.",
+                          clarificationQuestion: "",
+                          llmGoalIds: pendingClarification.suggestedGoalIds,
+                          llmCompetencyIds: pendingClarification.suggestedCompetencyIds,
+                          fallbackGoalIds: [],
+                          fallbackCompetencyIds: [],
+                          finalGoalIds: pendingClarification.suggestedGoalIds,
+                          finalCompetencyIds: pendingClarification.suggestedCompetencyIds
+                        });
                         resetEntryComposer();
                       }}
                     >
@@ -611,6 +722,90 @@ export default function Home() {
               {isAnalyzing ? "Analyzing..." : "Log accomplishment"}
             </button>
           </form>
+
+          {categorizationDebug ? (
+            <details className="debug-panel">
+              <summary>View categorization debug</summary>
+              <div className="debug-grid">
+                <div className="debug-row">
+                  <span>Source</span>
+                  <strong>{categorizationDebug.source}</strong>
+                </div>
+                <div className="debug-row">
+                  <span>Framework items</span>
+                  <strong>{categorizationDebug.frameworkCount}</strong>
+                </div>
+                <div className="debug-row">
+                  <span>OpenAI status</span>
+                  <strong>{categorizationDebug.openAiStatus}</strong>
+                </div>
+                <div className="debug-block">
+                  <span>Entry</span>
+                  <p>{categorizationDebug.accomplishment}</p>
+                </div>
+                {categorizationDebug.openAiError ? (
+                  <div className="debug-block">
+                    <span>OpenAI error</span>
+                    <p>{categorizationDebug.openAiError}</p>
+                  </div>
+                ) : null}
+                {categorizationDebug.assistantNote ? (
+                  <div className="debug-block">
+                    <span>Assistant note</span>
+                    <p>{categorizationDebug.assistantNote}</p>
+                  </div>
+                ) : null}
+                {categorizationDebug.clarificationQuestion ? (
+                  <div className="debug-block">
+                    <span>Clarification question</span>
+                    <p>{categorizationDebug.clarificationQuestion}</p>
+                  </div>
+                ) : null}
+                {categorizationDebug.clarificationAnswer ? (
+                  <div className="debug-block">
+                    <span>Clarification answer</span>
+                    <p>{categorizationDebug.clarificationAnswer}</p>
+                  </div>
+                ) : null}
+                <div className="debug-block">
+                  <span>OpenAI suggested goals</span>
+                  <p>
+                    {resolveLinkNames(categorizationDebug.llmGoalIds, "goal").join(", ") || "None"}
+                  </p>
+                </div>
+                <div className="debug-block">
+                  <span>OpenAI suggested competencies</span>
+                  <p>
+                    {resolveLinkNames(categorizationDebug.llmCompetencyIds, "competency").join(", ") || "None"}
+                  </p>
+                </div>
+                <div className="debug-block">
+                  <span>Fallback goals</span>
+                  <p>
+                    {resolveLinkNames(categorizationDebug.fallbackGoalIds, "goal").join(", ") || "None"}
+                  </p>
+                </div>
+                <div className="debug-block">
+                  <span>Fallback competencies</span>
+                  <p>
+                    {resolveLinkNames(categorizationDebug.fallbackCompetencyIds, "competency").join(", ") || "None"}
+                  </p>
+                </div>
+                <div className="debug-block">
+                  <span>Final goals saved</span>
+                  <p>
+                    {resolveLinkNames(categorizationDebug.finalGoalIds, "goal").join(", ") || "None"}
+                  </p>
+                </div>
+                <div className="debug-block">
+                  <span>Final competencies saved</span>
+                  <p>
+                    {resolveLinkNames(categorizationDebug.finalCompetencyIds, "competency").join(", ") || "None"}
+                  </p>
+                </div>
+              </div>
+            </details>
+          ) : null}
         </article>
 
         <aside className="panel side-panel">
