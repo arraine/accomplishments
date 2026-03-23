@@ -6,7 +6,7 @@ import { useAccomplishmentsStore } from "../lib/store-provider";
 import type { SummaryFilter } from "../lib/types";
 
 export default function SummaryPage() {
-  const { competencies, currentYearAccomplishments, framework, goalObjectives, goals, loaded } =
+  const { competencies, currentYearAccomplishments, framework, goals, loaded } =
     useAccomplishmentsStore();
   const [summaryFilter, setSummaryFilter] = useState<SummaryFilter>("all");
   const [summaryItemId, setSummaryItemId] = useState("all");
@@ -46,50 +46,32 @@ export default function SummaryPage() {
   }, [currentYearAccomplishments, groupedSummary.length]);
 
   const growthAreas = useMemo(() => {
-    const goalCounts = goals.map((goal) => ({
-      item: goal,
-      count: currentYearAccomplishments.filter((entry) => entry.links.includes(goal.id)).length
-    }));
     const competencyCounts = competencies.map((competency) => ({
       item: competency,
       count: currentYearAccomplishments.filter((entry) => entry.links.includes(competency.id)).length
     }));
 
-    const uncoveredGoals = goalCounts.filter((goal) => goal.count === 0).map((goal) => goal.item);
     const uncoveredCompetencies = competencyCounts
       .filter((competency) => competency.count === 0)
       .map((competency) => competency.item);
 
-    const totalUncovered = uncoveredGoals.length + uncoveredCompetencies.length;
-
-    if (totalUncovered >= 10) {
+    if (uncoveredCompetencies.length >= 10) {
       return {
-        goals: uncoveredGoals,
         competencies: uncoveredCompetencies,
         mode: "uncovered" as const
       };
     }
 
-    const rankedGoals = goalCounts
-      .sort((a, b) => a.count - b.count || a.item.name.localeCompare(b.item.name))
-      .slice(0, 10)
-      .map((goal) => goal.item);
     const rankedCompetencies = competencyCounts
       .sort((a, b) => a.count - b.count || a.item.name.localeCompare(b.item.name))
       .slice(0, 10)
       .map((competency) => competency.item);
 
     return {
-      goals: rankedGoals,
       competencies: rankedCompetencies,
       mode: "lowest" as const
     };
-  }, [competencies, currentYearAccomplishments, goals]);
-
-  const goalObjectiveMap = useMemo(
-    () => new Map(goalObjectives.map((goal) => [goal.id, goal])),
-    [goalObjectives]
-  );
+  }, [competencies, currentYearAccomplishments]);
 
   if (!loaded) {
     return (
@@ -228,38 +210,12 @@ export default function SummaryPage() {
             <h2>Areas for growth</h2>
             <p>
               {growthAreas.mode === "uncovered"
-                ? "These goals and competencies do not yet have linked accomplishments in the current calendar year."
-                : "You have fewer than 10 completely uncovered areas, so this view shows the lowest-coverage goals and competencies instead."}
+                ? "These competencies do not yet have linked accomplishments in the current calendar year."
+                : "You have fewer than 10 completely uncovered competencies, so this view shows the competencies with the lowest number of linked accomplishments instead."}
             </p>
           </div>
 
-          <div className="growth-grid">
-            <section className="growth-card">
-              <p className="summary-kind">goals</p>
-              <h3>Objectives needing evidence</h3>
-              {growthAreas.goals.length ? (
-                <ul className="growth-list">
-                  {growthAreas.goals.map((goal) => (
-                    <li key={goal.id}>
-                      <strong>{goal.name}</strong>
-                      {goalObjectiveMap.get(goal.id)?.keyResults.length ? (
-                        <span>
-                          {goalObjectiveMap
-                            .get(goal.id)
-                            ?.keyResults.map((keyResult) => keyResult.text)
-                            .join(" | ")}
-                        </span>
-                      ) : goal.description ? (
-                        <span>{goal.description}</span>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="empty-inline">Every goal has at least one linked accomplishment.</p>
-              )}
-            </section>
-
+          <div className="growth-grid single-growth-grid">
             <section className="growth-card">
               <p className="summary-kind">competencies</p>
               <h3>Skills needing evidence</h3>
