@@ -270,11 +270,11 @@ export function formatAssistantNote(
     .filter((item) => [...links.goals, ...links.competencies].includes(item.id))
     .map((item) => `${item.kind === "goal" ? "Goal" : "Competency"}: ${item.name}`);
 
-  const categoryText = names.length ? names.join(" | ") : "Awaiting goal/competency setup";
+  const categoryText = names.length ? names.join(" | ") : "No manual links selected yet";
 
   if (aggregated) {
-    return `Recorded and aggregated. This is occurrence ${count}. ${categoryText}.`;
+    return `Saved and aggregated. This is occurrence ${count}. ${categoryText}.`;
   }
 
-  return `Recorded. Categorized as ${categoryText}.`;
+  return `Saved. Linked to ${categoryText}.`;
 }
