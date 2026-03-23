@@ -10,7 +10,7 @@ import {
   normalizeText
 } from "./lib/store";
 import { useAccomplishmentsStore } from "./lib/store-provider";
-import type { LlmCategorizationResult } from "./lib/types";
+import type { LlmCategorizationResult, PriorCategorizationExample } from "./lib/types";
 
 export default function Home() {
   const {
@@ -76,6 +76,24 @@ export default function Home() {
     );
   }, [competencies, competencyQuery]);
 
+  const priorCategorizationExamples = useMemo<PriorCategorizationExample[]>(() => {
+    return accomplishments
+      .filter((item) => item.links.length > 0)
+      .slice(0, 12)
+      .map((item) => {
+        const goalMatches = goals.filter((goal) => item.links.includes(goal.id));
+        const competencyMatches = competencies.filter((competency) => item.links.includes(competency.id));
+
+        return {
+          text: item.text,
+          goalIds: goalMatches.map((goal) => goal.id),
+          goalNames: goalMatches.map((goal) => goal.name),
+          competencyIds: competencyMatches.map((competency) => competency.id),
+          competencyNames: competencyMatches.map((competency) => competency.name)
+        };
+      });
+  }, [accomplishments, competencies, goals]);
+
   function toggleSelection(id: string, type: "goal" | "competency") {
     if (type === "goal") {
       setSelectedGoals((current) =>
@@ -120,7 +138,8 @@ export default function Home() {
         accomplishment,
         framework,
         goalObjectives,
-        competencyCategories
+        competencyCategories,
+        priorExamples: priorCategorizationExamples
       })
     });
 

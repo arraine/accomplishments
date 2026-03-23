@@ -72,3 +72,11 @@ export type LlmCategorizationResult = {
   suggestedGoalIds: string[];
   suggestedCompetencyIds: string[];
 };
+
+export type PriorCategorizationExample = {
+  text: string;
+  goalIds: string[];
+  goalNames: string[];
+  competencyIds: string[];
+  competencyNames: string[];
+};

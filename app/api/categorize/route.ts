@@ -4,7 +4,8 @@ import type {
   CompetencyCategory,
   FrameworkItem,
   GoalObjective,
-  LlmCategorizationResult
+  LlmCategorizationResult,
+  PriorCategorizationExample
 } from "../../lib/types";
 
 type CategorizeRequest = {
@@ -12,6 +13,7 @@ type CategorizeRequest = {
   framework: FrameworkItem[];
   goalObjectives: GoalObjective[];
   competencyCategories: CompetencyCategory[];
+  priorExamples: PriorCategorizationExample[];
 };
 
 const responseSchema = {
@@ -58,6 +60,7 @@ export async function POST(request: Request) {
   const framework = body.framework ?? [];
   const goalObjectives = body.goalObjectives ?? [];
   const competencyCategories = body.competencyCategories ?? [];
+  const priorExamples = body.priorExamples ?? [];
 
   if (!accomplishment) {
     return NextResponse.json({ error: "Accomplishment text is required." }, { status: 400 });
@@ -105,7 +108,7 @@ export async function POST(request: Request) {
             {
               type: "input_text",
               text:
-                "You categorize brief daily work accomplishments against user-defined goals and competencies. Use semantic reasoning, not surface keyword overlap. Infer likely intent, responsibility, outcome, collaboration, ownership, execution, judgment, communication, and business impact from the accomplishment. Choose only IDs from the provided framework. Return up to 2 goals and up to 2 competencies. If an accomplishment plausibly demonstrates a competency or advances an objective even with different wording, select it. Prefer the strongest plausible matches rather than requiring exact phrase overlap. The assistant note should be concise, professional, supportive, and mention the selected labels when they fit."
+                "You categorize brief daily work accomplishments against user-defined goals and competencies. Use semantic reasoning, not surface keyword overlap. Infer likely intent, responsibility, outcome, collaboration, ownership, execution, judgment, communication, and business impact from the accomplishment. Choose only IDs from the provided framework. Return up to 2 goals and up to 2 competencies. If an accomplishment plausibly demonstrates a competency or advances an objective even with different wording, select it. Prefer the strongest plausible matches rather than requiring exact phrase overlap. Use prior categorized examples as precedents for how this user tends to map work, but do not copy them blindly when the new accomplishment points somewhere else. The assistant note should be concise, professional, supportive, and mention the selected labels when they fit."
             }
           ]
         },
@@ -118,11 +121,12 @@ export async function POST(request: Request) {
                 {
                   accomplishment,
                   instructions:
-                    "Map this accomplishment to the most relevant goals and competencies using the richer objective/key-result and category context below.",
+                    "Map this accomplishment to the most relevant goals and competencies using the richer objective/key-result and category context below. Use the prior examples as user-specific guidance for thematic matching.",
                   goalObjectives,
                   competencyCategories,
                   goals,
-                  competencies
+                  competencies,
+                  priorExamples
                 },
                 null,
                 2
