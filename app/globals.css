@@ -978,6 +978,20 @@ textarea {
   margin: 0;
 }
 
+.log-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.delete-link {
+  border: 0;
+  background: transparent;
+  color: var(--primary-strong);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
 .log-card h3 {
   margin-top: 10px;
   line-height: 1.35;

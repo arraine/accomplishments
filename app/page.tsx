@@ -59,6 +59,25 @@ export default function Home() {
     );
   }
 
+  function handleDeleteEntry(id: string) {
+    const entry = accomplishments.find((item) => item.id === id);
+
+    if (!entry) {
+      return;
+    }
+
+    const shouldDelete = window.confirm(
+      `Delete this tracked entry?\n\n"${entry.text}"`
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    setAccomplishments((current) => current.filter((item) => item.id !== id));
+    setMessage("Tracked entry deleted.");
+  }
+
   async function fetchLlmCategorization(
     accomplishment: string
   ): Promise<LlmCategorizationResult | null> {
@@ -380,12 +399,23 @@ export default function Home() {
                   item.links.includes(frameworkItem.id)
                 );
 
-                return (
-                  <article key={item.id} className="log-card">
-                    <div className="log-header">
-                      <p>{formatFriendlyDate(item.date)}</p>
-                      <span>{item.count > 1 ? `${item.count} related wins` : "single entry"}</span>
-                    </div>
+                  return (
+                    <article key={item.id} className="log-card">
+                      <div className="log-header">
+                        <p>{formatFriendlyDate(item.date)}</p>
+                        <div className="log-header-actions">
+                          <span>
+                            {item.count > 1 ? `${item.count} related wins` : "single entry"}
+                          </span>
+                          <button
+                            type="button"
+                            className="delete-link"
+                            onClick={() => handleDeleteEntry(item.id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
                     <h3>{item.text}</h3>
                     <p className="assistant-copy">{item.assistantNote}</p>
                     <div className="chip-row">
