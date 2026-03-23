@@ -16,8 +16,10 @@ export default function Home() {
   const {
     accomplishments,
     competencies,
+    competencyCategories,
     currentYearAccomplishments,
     framework,
+    goalObjectives,
     goals,
     loaded,
     setAccomplishments,
@@ -116,7 +118,9 @@ export default function Home() {
       },
       body: JSON.stringify({
         accomplishment,
-        framework
+        framework,
+        goalObjectives,
+        competencyCategories
       })
     });
 
@@ -156,7 +160,10 @@ export default function Home() {
             ? llmSuggested.suggestedCompetencyIds
             : suggested?.competencies ?? []
       };
-      const suggestedMatch = findSuggestedMatch(trimmed, accomplishments);
+      const suggestedMatch = findSuggestedMatch(trimmed, accomplishments, [
+        ...draftLinks.goals,
+        ...draftLinks.competencies
+      ]);
 
       if (suggestedMatch) {
         setAccomplishments((current) =>

@@ -173,7 +173,8 @@ function jaccardSimilarity(a: string[], b: string[]) {
 
 export function findSuggestedMatch(
   text: string,
-  accomplishments: Accomplishment[]
+  accomplishments: Accomplishment[],
+  preferredLinks: string[] = []
 ): SuggestedMatch | null {
   const candidateTokens = tokenize(text);
   const recentCutoff = Date.now() - 1000 * 60 * 60 * 24 * 14;
@@ -187,13 +188,31 @@ export function findSuggestedMatch(
       continue;
     }
 
-    const score = jaccardSimilarity(candidateTokens, tokenize(accomplishment.text));
+    const textVariants = [accomplishment.text, ...accomplishment.history];
+    const similarityScore = textVariants.reduce((best, variant) => {
+      const variantTokens = tokenize(variant);
+      const jaccardScore = jaccardSimilarity(candidateTokens, variantTokens);
+      const candidateNormalized = normalizeText(text);
+      const variantNormalized = normalizeText(variant);
+      const containmentScore =
+        candidateNormalized.includes(variantNormalized) || variantNormalized.includes(candidateNormalized)
+          ? 0.42
+          : 0;
 
-    if (score >= 0.34 && score > bestScore) {
+      return Math.max(best, jaccardScore, containmentScore);
+    }, 0);
+    const sharedPreferredLinks = preferredLinks.filter((link) => accomplishment.links.includes(link));
+    const linkBoost = sharedPreferredLinks.length ? 0.12 : 0;
+    const score = similarityScore + linkBoost;
+    const threshold = sharedPreferredLinks.length ? 0.24 : 0.32;
+
+    if (score >= threshold && score > bestScore) {
       bestScore = score;
       bestMatch = {
         accomplishmentId: accomplishment.id,
-        reason: `Similar wording and focus to "${accomplishment.text}".`
+        reason: sharedPreferredLinks.length
+          ? `Similar to "${accomplishment.text}" and aligned to the same manual links.`
+          : `Similar wording and focus to "${accomplishment.text}".`
       };
     }
   }

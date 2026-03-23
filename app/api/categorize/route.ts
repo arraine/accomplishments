@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { getCategorizationModel, getOpenAiClient, isOpenAiConfigured } from "../../lib/openai";
-import type { FrameworkItem, LlmCategorizationResult } from "../../lib/types";
+import type {
+  CompetencyCategory,
+  FrameworkItem,
+  GoalObjective,
+  LlmCategorizationResult
+} from "../../lib/types";
 
 type CategorizeRequest = {
   accomplishment: string;
   framework: FrameworkItem[];
+  goalObjectives: GoalObjective[];
+  competencyCategories: CompetencyCategory[];
 };
 
 const responseSchema = {
@@ -49,6 +56,8 @@ export async function POST(request: Request) {
   const body = (await request.json()) as Partial<CategorizeRequest>;
   const accomplishment = body.accomplishment?.trim();
   const framework = body.framework ?? [];
+  const goalObjectives = body.goalObjectives ?? [];
+  const competencyCategories = body.competencyCategories ?? [];
 
   if (!accomplishment) {
     return NextResponse.json({ error: "Accomplishment text is required." }, { status: 400 });
@@ -75,7 +84,8 @@ export async function POST(request: Request) {
     .map((item) => ({
       id: item.id,
       name: item.name,
-      description: item.description
+      description: item.description,
+      categoryName: item.categoryName ?? ""
     }));
 
   try {
@@ -95,7 +105,7 @@ export async function POST(request: Request) {
             {
               type: "input_text",
               text:
-                "You categorize work accomplishments against user-defined goals and competencies. Choose only IDs from the provided framework. Prefer precision over recall. Return no more than 2 goals and 2 competencies. The assistant note should be concise, professional, supportive, and mention the selected labels when they fit."
+                "You categorize brief daily work accomplishments against user-defined goals and competencies. Use semantic reasoning, not surface keyword overlap. Infer likely intent, responsibility, outcome, collaboration, ownership, execution, judgment, communication, and business impact from the accomplishment. Choose only IDs from the provided framework. Return up to 2 goals and up to 2 competencies. If an accomplishment plausibly demonstrates a competency or advances an objective even with different wording, select it. Prefer the strongest plausible matches rather than requiring exact phrase overlap. The assistant note should be concise, professional, supportive, and mention the selected labels when they fit."
             }
           ]
         },
@@ -107,6 +117,10 @@ export async function POST(request: Request) {
               text: JSON.stringify(
                 {
                   accomplishment,
+                  instructions:
+                    "Map this accomplishment to the most relevant goals and competencies using the richer objective/key-result and category context below.",
+                  goalObjectives,
+                  competencyCategories,
                   goals,
                   competencies
                 },
