@@ -281,20 +281,6 @@ export default function CompetenciesPage() {
                           placeholder="Example: Communication"
                         />
                       </label>
-
-                      <label>
-                        Description
-                        <textarea
-                          value={competency.description}
-                          onChange={(event) =>
-                            updateCompetency(category.id, competency.id, {
-                              description: event.target.value
-                            })
-                          }
-                          rows={3}
-                          placeholder="Example: Clearly align stakeholders around priorities, risks, and tradeoffs."
-                        />
-                      </label>
                     </article>
                   ))}
                 </div>
