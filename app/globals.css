@@ -1038,6 +1038,39 @@ summary {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
+.growth-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.growth-card {
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.18);
+  padding: 18px;
+}
+
+.growth-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.growth-list {
+  margin: 14px 0 0;
+  padding-left: 18px;
+}
+
+.growth-list li + li {
+  margin-top: 10px;
+}
+
+.growth-list span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
+
 .level-row,
 .editor-actions,
 .category-head {
@@ -1096,7 +1129,8 @@ summary {
   .secondary-home-grid,
   .entry-hero,
   .entry-support-grid,
-  .compact-stats {
+  .compact-stats,
+  .growth-grid {
     grid-template-columns: 1fr;
   }
 
