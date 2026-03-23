@@ -12,6 +12,19 @@ import {
 import { useAccomplishmentsStore } from "./lib/store-provider";
 import type { LlmCategorizationResult, PriorCategorizationExample } from "./lib/types";
 
+type PendingClarification = {
+  accomplishment: string;
+  date: string;
+  question: string;
+  suggestedGoalIds: string[];
+  suggestedCompetencyIds: string[];
+};
+
+type DraftLinks = {
+  goals: string[];
+  competencies: string[];
+};
+
 export default function Home() {
   const {
     accomplishments,
@@ -32,6 +45,8 @@ export default function Home() {
   const [goalQuery, setGoalQuery] = useState("");
   const [competencyQuery, setCompetencyQuery] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [clarificationAnswer, setClarificationAnswer] = useState("");
+  const [pendingClarification, setPendingClarification] = useState<PendingClarification | null>(null);
   const [message, setMessage] = useState(
     "Acting as your accomplishments assistant. Record what you did, and I’ll keep the log organized against your goals and competencies."
   );
@@ -127,7 +142,8 @@ export default function Home() {
   }
 
   async function fetchLlmCategorization(
-    accomplishment: string
+    accomplishment: string,
+    clarification?: string
   ): Promise<LlmCategorizationResult | null> {
     const response = await fetch("/api/categorize", {
       method: "POST",
@@ -139,7 +155,8 @@ export default function Home() {
         framework,
         goalObjectives,
         competencyCategories,
-        priorExamples: priorCategorizationExamples
+        priorExamples: priorCategorizationExamples,
+        clarificationAnswer: clarification ?? ""
       })
     });
 
@@ -148,6 +165,84 @@ export default function Home() {
     }
 
     return (await response.json()) as LlmCategorizationResult;
+  }
+
+  function resetEntryComposer() {
+    setEntryText("");
+    setSelectedGoals([]);
+    setSelectedCompetencies([]);
+    setGoalQuery("");
+    setCompetencyQuery("");
+    setPendingClarification(null);
+    setClarificationAnswer("");
+  }
+
+  function saveEntry(
+    trimmed: string,
+    effectiveDate: string,
+    draftLinks: DraftLinks,
+    llmSuggested: LlmCategorizationResult | null
+  ) {
+    const suggestedMatch = findSuggestedMatch(trimmed, accomplishments, [
+      ...draftLinks.goals,
+      ...draftLinks.competencies
+    ]);
+
+    if (suggestedMatch) {
+      setAccomplishments((current) =>
+        current.map((item) => {
+          if (item.id !== suggestedMatch.accomplishmentId) {
+            return item;
+          }
+
+          const nextCount = item.count + 1;
+          const combinedLinks = Array.from(
+            new Set([...item.links, ...draftLinks.goals, ...draftLinks.competencies])
+          );
+
+          return {
+            ...item,
+            date: effectiveDate,
+            createdAt: new Date(`${effectiveDate}T12:00:00`).toISOString(),
+            links: combinedLinks,
+            count: nextCount,
+            history: [...item.history, trimmed],
+            assistantNote: formatAssistantNote(
+              {
+                goals: combinedLinks.filter((id) => goals.some((goal) => goal.id === id)),
+                competencies: combinedLinks.filter((id) =>
+                  competencies.some((competency) => competency.id === id)
+                )
+              },
+              framework,
+              nextCount,
+              true
+            )
+          };
+        })
+      );
+      setMessage(
+        `Logged and aggregated with a recent entry. ${suggestedMatch.reason} Occurrence count increased.`
+      );
+      return;
+    }
+
+    const links = [...draftLinks.goals, ...draftLinks.competencies];
+    const newEntry = {
+      id: crypto.randomUUID(),
+      createdAt: new Date(`${effectiveDate}T12:00:00`).toISOString(),
+      date: effectiveDate,
+      text: trimmed,
+      normalized: normalizeText(trimmed),
+      links,
+      count: 1,
+      history: [trimmed],
+      assistantNote:
+        llmSuggested?.assistantNote || formatAssistantNote(draftLinks, framework, 1, false)
+    };
+
+    setAccomplishments((current) => [newEntry, ...current]);
+    setMessage(newEntry.assistantNote);
   }
 
   async function handleEntrySubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -179,69 +274,76 @@ export default function Home() {
             ? llmSuggested.suggestedCompetencyIds
             : suggested?.competencies ?? []
       };
-      const suggestedMatch = findSuggestedMatch(trimmed, accomplishments, [
-        ...draftLinks.goals,
-        ...draftLinks.competencies
-      ]);
-
-      if (suggestedMatch) {
-        setAccomplishments((current) =>
-          current.map((item) => {
-            if (item.id !== suggestedMatch.accomplishmentId) {
-              return item;
-            }
-
-            const nextCount = item.count + 1;
-            const combinedLinks = Array.from(
-              new Set([...item.links, ...draftLinks.goals, ...draftLinks.competencies])
-            );
-
-            return {
-              ...item,
-              date: entryDate,
-              createdAt: new Date(`${entryDate}T12:00:00`).toISOString(),
-              links: combinedLinks,
-              count: nextCount,
-              history: [...item.history, trimmed],
-              assistantNote: formatAssistantNote(
-                {
-                  goals: combinedLinks.filter((id) => goals.some((goal) => goal.id === id)),
-                  competencies: combinedLinks.filter((id) =>
-                    competencies.some((competency) => competency.id === id)
-                  )
-                },
-                framework,
-                nextCount,
-                true
-              )
-            };
-          })
-        );
-        setMessage(
-          `Logged and aggregated with a recent entry. ${suggestedMatch.reason} Occurrence count increased.`
-        );
-      } else {
-        const links = [...draftLinks.goals, ...draftLinks.competencies];
-        const newEntry = {
-          id: crypto.randomUUID(),
-          createdAt: new Date(`${entryDate}T12:00:00`).toISOString(),
+      if (llmSuggested?.resultType === "clarification" && llmSuggested.clarificationQuestion) {
+        setPendingClarification({
+          accomplishment: trimmed,
           date: entryDate,
-          text: trimmed,
-          normalized: normalizeText(trimmed),
-          links,
-          count: 1,
-          history: [trimmed],
-          assistantNote:
-            llmSuggested?.assistantNote || formatAssistantNote(draftLinks, framework, 1, false)
-        };
-
-        setAccomplishments((current) => [newEntry, ...current]);
-        setMessage(newEntry.assistantNote);
+          question: llmSuggested.clarificationQuestion,
+          suggestedGoalIds: draftLinks.goals,
+          suggestedCompetencyIds: draftLinks.competencies
+        });
+        setMessage("One follow-up will help the assistant categorize this more accurately.");
+        return;
       }
 
-      setEntryText("");
-      setSelectedGoals([]);
-      setSelectedCompetencies([]);
+      saveEntry(trimmed, entryDate, draftLinks, llmSuggested);
+      resetEntryComposer();
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }
+
+  async function handleClarificationSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!pendingClarification) {
+      return;
+    }
+
+    setIsAnalyzing(true);
+
+    try {
+      const llmSuggested = await fetchLlmCategorization(
+        pendingClarification.accomplishment,
+        clarificationAnswer
+      );
+      const fallbackSuggested = framework.length
+        ? classifyAccomplishment(pendingClarification.accomplishment, framework)
+        : null;
+      const draftLinks = {
+        goals:
+          llmSuggested?.suggestedGoalIds.length
+            ? llmSuggested.suggestedGoalIds
+            : pendingClarification.suggestedGoalIds.length
+              ? pendingClarification.suggestedGoalIds
+              : fallbackSuggested?.goals ?? [],
+        competencies:
+          llmSuggested?.suggestedCompetencyIds.length
+            ? llmSuggested.suggestedCompetencyIds
+            : pendingClarification.suggestedCompetencyIds.length
+              ? pendingClarification.suggestedCompetencyIds
+              : fallbackSuggested?.competencies ?? []
+      };
+
+      if (llmSuggested?.resultType === "clarification" && llmSuggested.clarificationQuestion) {
+        setPendingClarification({
+          accomplishment: pendingClarification.accomplishment,
+          date: pendingClarification.date,
+          question: llmSuggested.clarificationQuestion,
+          suggestedGoalIds: draftLinks.goals,
+          suggestedCompetencyIds: draftLinks.competencies
+        });
+        setMessage("The assistant still needs one sharper detail, but its best suggestions are ready if you want to save now.");
+        return;
+      }
+
+      saveEntry(
+        pendingClarification.accomplishment,
+        pendingClarification.date,
+        draftLinks,
+        llmSuggested
+      );
+      resetEntryComposer();
     } finally {
       setIsAnalyzing(false);
     }
@@ -423,6 +525,87 @@ export default function Home() {
                 </details>
               </div>
             </div>
+
+            {pendingClarification ? (
+              <div className="clarification-card">
+                <p className="assistant-label">One quick question</p>
+                <p>{pendingClarification.question}</p>
+                <div className="chip-row">
+                  {pendingClarification.suggestedGoalIds.map((id) => {
+                    const goal = goals.find((item) => item.id === id);
+                    return goal ? (
+                      <span key={id} className="chip static">
+                        goal: {goal.name}
+                      </span>
+                    ) : null;
+                  })}
+                  {pendingClarification.suggestedCompetencyIds.map((id) => {
+                    const competency = competencies.find((item) => item.id === id);
+                    return competency ? (
+                      <span key={id} className="chip static">
+                        competency: {competency.name}
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+                <form className="clarification-form" onSubmit={handleClarificationSubmit}>
+                  <label>
+                    Your answer
+                    <input
+                      type="text"
+                      value={clarificationAnswer}
+                      onChange={(event) => setClarificationAnswer(event.target.value)}
+                      placeholder="Add one short clarifying detail"
+                    />
+                  </label>
+                  <div className="clarification-actions">
+                    <button
+                      className="primary-button"
+                      type="submit"
+                      disabled={isAnalyzing || !clarificationAnswer.trim()}
+                    >
+                      {isAnalyzing ? "Analyzing..." : "Continue"}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => {
+                        saveEntry(
+                          pendingClarification.accomplishment,
+                          pendingClarification.date,
+                          {
+                            goals: pendingClarification.suggestedGoalIds,
+                            competencies: pendingClarification.suggestedCompetencyIds
+                          },
+                          {
+                            resultType: "direct",
+                            assistantNote:
+                              "Recorded using the assistant's best current suggestions.",
+                            suggestedGoalIds: pendingClarification.suggestedGoalIds,
+                            suggestedCompetencyIds: pendingClarification.suggestedCompetencyIds,
+                            clarificationQuestion: ""
+                          }
+                        );
+                        resetEntryComposer();
+                      }}
+                    >
+                      Use top suggestions
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => {
+                        setPendingClarification(null);
+                        setClarificationAnswer("");
+                        setMessage("Clarification dismissed. You can adjust manual links or log a different wording.");
+                      }}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </form>
+              </div>
+            ) : null}
 
             <button className="primary-button" type="submit" disabled={isAnalyzing}>
               {isAnalyzing ? "Analyzing..." : "Log accomplishment"}

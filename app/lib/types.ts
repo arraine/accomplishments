@@ -68,9 +68,11 @@ export type StoredState = {
 };
 
 export type LlmCategorizationResult = {
+  resultType: "direct" | "clarification";
   assistantNote: string;
   suggestedGoalIds: string[];
   suggestedCompetencyIds: string[];
+  clarificationQuestion: string;
 };
 
 export type PriorCategorizationExample = {

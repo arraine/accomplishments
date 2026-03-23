@@ -14,6 +14,7 @@ type CategorizeRequest = {
   goalObjectives: GoalObjective[];
   competencyCategories: CompetencyCategory[];
   priorExamples: PriorCategorizationExample[];
+  clarificationAnswer?: string;
 };
 
 const responseSchema = {
@@ -26,6 +27,10 @@ const responseSchema = {
         type: "string",
         description:
           "A short supportive note acknowledging the accomplishment and naming the selected goal and competency labels when possible."
+      },
+      resultType: {
+        type: "string",
+        enum: ["direct", "clarification"]
       },
       suggestedGoalIds: {
         type: "array",
@@ -40,12 +45,50 @@ const responseSchema = {
           type: "string"
         },
         maxItems: 2
+      },
+      clarificationQuestion: {
+        type: "string",
+        description:
+          "One concise follow-up question to ask only when categorization is ambiguous. Empty string when no follow-up is needed."
       }
     },
-    required: ["assistantNote", "suggestedGoalIds", "suggestedCompetencyIds"]
+    required: [
+      "assistantNote",
+      "resultType",
+      "suggestedGoalIds",
+      "suggestedCompetencyIds",
+      "clarificationQuestion"
+    ]
   },
   strict: true
 } as const;
+
+const assistantInstruction = `
+You are the user's Accomplishments assistant.
+
+Your job is to record, categorize, and summarize daily accomplishments relative to the user's defined goals and competencies.
+
+Priorities:
+- Capture the accomplishment accurately.
+- Categorize it against the user's saved goals and competencies.
+- Use conceptual similarity, not just wording overlap.
+- Prefer semantic interpretation of the work: intent, ownership, complexity, collaboration, execution, leadership, judgment, communication, and business impact.
+- Treat brief daily task descriptions as valid evidence when they plausibly support a broader goal or competency.
+
+Behavior rules:
+- If the user gives a short or plain description, infer the likely meaningful outcome from context.
+- If an accomplishment plausibly advances a goal or demonstrates a competency even with different phrasing, select it.
+- Prefer the strongest 1-2 goal matches and 1-2 competency matches rather than spreading too broadly.
+- If prior categorized examples suggest how this user usually maps work, use them as guidance.
+- Do not require exact keyword overlap.
+- Only return no matches when there is genuinely not enough evidence.
+
+Assistant note style:
+- Professional, organized, supportive.
+- Short and precise.
+- Mention the selected goals or competencies when useful.
+- Sound like a capable accomplishments-tracking assistant, not a generic classifier.
+`.trim();
 
 export async function POST(request: Request) {
   if (!isOpenAiConfigured()) {
@@ -61,6 +104,7 @@ export async function POST(request: Request) {
   const goalObjectives = body.goalObjectives ?? [];
   const competencyCategories = body.competencyCategories ?? [];
   const priorExamples = body.priorExamples ?? [];
+  const clarificationAnswer = body.clarificationAnswer?.trim() ?? "";
 
   if (!accomplishment) {
     return NextResponse.json({ error: "Accomplishment text is required." }, { status: 400 });
@@ -107,8 +151,13 @@ export async function POST(request: Request) {
           content: [
             {
               type: "input_text",
-              text:
-                "You categorize brief daily work accomplishments against user-defined goals and competencies. Use semantic reasoning, not surface keyword overlap. Infer likely intent, responsibility, outcome, collaboration, ownership, execution, judgment, communication, and business impact from the accomplishment. Choose only IDs from the provided framework. Return up to 2 goals and up to 2 competencies. If an accomplishment plausibly demonstrates a competency or advances an objective even with different wording, select it. Prefer the strongest plausible matches rather than requiring exact phrase overlap. Use prior categorized examples as precedents for how this user tends to map work, but do not copy them blindly when the new accomplishment points somewhere else. The assistant note should be concise, professional, supportive, and mention the selected labels when they fit."
+              text: `${assistantInstruction}
+
+Output rules:
+- Choose only IDs from the provided framework.
+- Return up to 2 goals and up to 2 competencies.
+- Use prior categorized examples as precedents for how this user tends to map work, but do not copy them blindly when the new accomplishment points somewhere else.
+- The assistant note should be concise, professional, supportive, and mention the selected labels when they fit.`
             }
           ]
         },
@@ -120,8 +169,9 @@ export async function POST(request: Request) {
               text: JSON.stringify(
                 {
                   accomplishment,
+                  clarificationAnswer,
                   instructions:
-                    "Map this accomplishment to the most relevant goals and competencies using the richer objective/key-result and category context below. Use the prior examples as user-specific guidance for thematic matching.",
+                    "Map this accomplishment to the most relevant goals and competencies using the richer objective/key-result and category context below. Use the prior examples as user-specific guidance for thematic matching. If confidence is low or the accomplishment could map to multiple different themes, ask exactly one short follow-up question and still return your best provisional top suggestions in suggestedGoalIds and suggestedCompetencyIds.",
                   goalObjectives,
                   competencyCategories,
                   goals,
@@ -140,7 +190,9 @@ export async function POST(request: Request) {
     const parsed = JSON.parse(response.output_text) as LlmCategorizationResult;
 
     return NextResponse.json({
+      resultType: parsed.resultType,
       assistantNote: parsed.assistantNote,
+      clarificationQuestion: parsed.clarificationQuestion,
       suggestedGoalIds: parsed.suggestedGoalIds.filter((id) => goals.some((item) => item.id === id)),
       suggestedCompetencyIds: parsed.suggestedCompetencyIds.filter((id) =>
         competencies.some((item) => item.id === id)
