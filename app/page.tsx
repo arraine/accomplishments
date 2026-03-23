@@ -27,6 +27,8 @@ export default function Home() {
   const [entryDate, setEntryDate] = useState(today);
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
   const [selectedCompetencies, setSelectedCompetencies] = useState<string[]>([]);
+  const [goalQuery, setGoalQuery] = useState("");
+  const [competencyQuery, setCompetencyQuery] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [message, setMessage] = useState(
     "Acting as your accomplishments assistant. Record what you did, and I’ll keep the log organized against your goals and competencies."
@@ -45,6 +47,32 @@ export default function Home() {
       linkedCount
     };
   }, [accomplishments, goals]);
+
+  const filteredGoals = useMemo(() => {
+    const query = goalQuery.trim().toLowerCase();
+
+    if (!query) {
+      return goals;
+    }
+
+    return goals.filter((goal) =>
+      `${goal.name} ${goal.description}`.toLowerCase().includes(query)
+    );
+  }, [goalQuery, goals]);
+
+  const filteredCompetencies = useMemo(() => {
+    const query = competencyQuery.trim().toLowerCase();
+
+    if (!query) {
+      return competencies;
+    }
+
+    return competencies.filter((competency) =>
+      `${competency.name} ${competency.description} ${competency.categoryName ?? ""}`
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [competencies, competencyQuery]);
 
   function toggleSelection(id: string, type: "goal" | "competency") {
     if (type === "goal") {
@@ -293,48 +321,80 @@ export default function Home() {
 
             <div className="selection-block">
               <p>Optional manual links</p>
-              <div className="chip-groups">
-                <div>
-                  <span className="group-label">Goals</span>
-                  <div className="chip-row">
-                    {goals.length ? (
-                      goals.map((goal) => (
-                        <button
-                          key={goal.id}
-                          type="button"
-                          className={selectedGoals.includes(goal.id) ? "chip active" : "chip"}
-                          onClick={() => toggleSelection(goal.id, "goal")}
-                        >
-                          {goal.name}
-                        </button>
-                      ))
-                    ) : (
-                      <span className="empty-inline">No goals yet</span>
-                    )}
-                  </div>
-                </div>
+              <div className="manual-link-panels">
+                <details className="link-panel" open>
+                  <summary>
+                    <span>Goals</span>
+                    <span>{selectedGoals.length} selected</span>
+                  </summary>
+                  {goals.length ? (
+                    <div className="link-panel-body">
+                      <input
+                        className="link-search"
+                        type="text"
+                        value={goalQuery}
+                        onChange={(event) => setGoalQuery(event.target.value)}
+                        placeholder="Search goals"
+                      />
+                      <div className="chip-row">
+                        {filteredGoals.length ? (
+                          filteredGoals.map((goal) => (
+                            <button
+                              key={goal.id}
+                              type="button"
+                              className={selectedGoals.includes(goal.id) ? "chip active" : "chip"}
+                              onClick={() => toggleSelection(goal.id, "goal")}
+                            >
+                              {goal.name}
+                            </button>
+                          ))
+                        ) : (
+                          <span className="empty-inline">No matching goals</span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="empty-inline">No goals yet</span>
+                  )}
+                </details>
 
-                <div>
-                  <span className="group-label">Competencies</span>
-                  <div className="chip-row">
-                    {competencies.length ? (
-                      competencies.map((competency) => (
-                        <button
-                          key={competency.id}
-                          type="button"
-                          className={
-                            selectedCompetencies.includes(competency.id) ? "chip active" : "chip"
-                          }
-                          onClick={() => toggleSelection(competency.id, "competency")}
-                        >
-                          {competency.name}
-                        </button>
-                      ))
-                    ) : (
-                      <span className="empty-inline">No competencies yet</span>
-                    )}
-                  </div>
-                </div>
+                <details className="link-panel">
+                  <summary>
+                    <span>Competencies</span>
+                    <span>{selectedCompetencies.length} selected</span>
+                  </summary>
+                  {competencies.length ? (
+                    <div className="link-panel-body">
+                      <input
+                        className="link-search"
+                        type="text"
+                        value={competencyQuery}
+                        onChange={(event) => setCompetencyQuery(event.target.value)}
+                        placeholder="Search competencies"
+                      />
+                      <div className="chip-row">
+                        {filteredCompetencies.length ? (
+                          filteredCompetencies.map((competency) => (
+                            <button
+                              key={competency.id}
+                              type="button"
+                              className={
+                                selectedCompetencies.includes(competency.id) ? "chip active" : "chip"
+                              }
+                              onClick={() => toggleSelection(competency.id, "competency")}
+                            >
+                              {competency.name}
+                            </button>
+                          ))
+                        ) : (
+                          <span className="empty-inline">No matching competencies</span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="empty-inline">No competencies yet</span>
+                  )}
+                </details>
               </div>
             </div>
 

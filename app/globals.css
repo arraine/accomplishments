@@ -759,6 +759,12 @@ details li {
   gap: 16px;
 }
 
+.manual-link-panels,
+.link-panel-body {
+  display: grid;
+  gap: 12px;
+}
+
 .spotlight-entry-form textarea {
   min-height: 180px;
   font-size: 1.02rem;
@@ -875,6 +881,41 @@ textarea {
 .selection-block p {
   margin: 0;
   color: var(--muted);
+}
+
+.link-panel {
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.18);
+  padding: 14px 16px;
+}
+
+.link-panel summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  cursor: pointer;
+  color: var(--primary-strong);
+  font-weight: 600;
+  list-style: none;
+}
+
+.link-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.link-panel[open] summary {
+  margin-bottom: 12px;
+}
+
+.link-search {
+  width: 100%;
+  border: 1px solid rgba(97, 71, 37, 0.16);
+  border-radius: 16px;
+  background: var(--surface-strong);
+  padding: 12px 14px;
+  color: var(--text);
 }
 
 .chip-row {
