@@ -6,7 +6,7 @@ import { useAccomplishmentsStore } from "../lib/store-provider";
 import type { SummaryFilter } from "../lib/types";
 
 export default function SummaryPage() {
-  const { competencies, currentYearAccomplishments, framework, goals, loaded } =
+  const { competencies, currentYearAccomplishments, framework, goalObjectives, goals, loaded } =
     useAccomplishmentsStore();
   const [summaryFilter, setSummaryFilter] = useState<SummaryFilter>("all");
   const [summaryItemId, setSummaryItemId] = useState("all");
@@ -85,6 +85,11 @@ export default function SummaryPage() {
       mode: "lowest" as const
     };
   }, [competencies, currentYearAccomplishments, goals]);
+
+  const goalObjectiveMap = useMemo(
+    () => new Map(goalObjectives.map((goal) => [goal.id, goal])),
+    [goalObjectives]
+  );
 
   if (!loaded) {
     return (
@@ -237,7 +242,16 @@ export default function SummaryPage() {
                   {growthAreas.goals.map((goal) => (
                     <li key={goal.id}>
                       <strong>{goal.name}</strong>
-                      {goal.description ? <span>{goal.description}</span> : null}
+                      {goalObjectiveMap.get(goal.id)?.keyResults.length ? (
+                        <span>
+                          {goalObjectiveMap
+                            .get(goal.id)
+                            ?.keyResults.map((keyResult) => keyResult.text)
+                            .join(" | ")}
+                        </span>
+                      ) : goal.description ? (
+                        <span>{goal.description}</span>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
